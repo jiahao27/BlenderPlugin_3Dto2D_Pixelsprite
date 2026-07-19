@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = ROOT / "src"
-ADDON_NAME = "blender_plugin_starter"
+ADDON_NAME = "sprite_baker"
 ADDON_DIR = SRC_DIR / ADDON_NAME
 DIST_DIR = ROOT / "dist"
 OUTPUT_ZIP = DIST_DIR / f"{ADDON_NAME}.zip"
