@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Build outputs
+build/
+dist/
+*.zip
+*.egg-info/
+
+# Blender
+*.blend1
+*.blend2
+*.blend@
+*.blend~
+*.blend.lock
+*.autosave
+*.crash.txt
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
