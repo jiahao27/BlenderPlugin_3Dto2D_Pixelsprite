@@ -8,7 +8,7 @@ from .validation import get_active_item, parse_custom_directions, validate_setti
 
 class SBK_OT_add_export_item(bpy.types.Operator):
     bl_idname = "sprite_baker.add_export_item"
-    bl_label = "Add Export Item"
+    bl_label = "添加导出项"
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
@@ -24,7 +24,7 @@ class SBK_OT_add_export_item(bpy.types.Operator):
 
 class SBK_OT_remove_export_item(bpy.types.Operator):
     bl_idname = "sprite_baker.remove_export_item"
-    bl_label = "Remove Export Item"
+    bl_label = "删除导出项"
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
@@ -37,7 +37,7 @@ class SBK_OT_remove_export_item(bpy.types.Operator):
 
 class SBK_OT_add_action(bpy.types.Operator):
     bl_idname = "sprite_baker.add_action"
-    bl_label = "Add Action"
+    bl_label = "添加动作"
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
@@ -54,7 +54,7 @@ class SBK_OT_add_action(bpy.types.Operator):
 
 class SBK_OT_remove_action(bpy.types.Operator):
     bl_idname = "sprite_baker.remove_action"
-    bl_label = "Remove Action"
+    bl_label = "删除动作"
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
@@ -67,7 +67,7 @@ class SBK_OT_remove_action(bpy.types.Operator):
 
 class SBK_OT_generate_directions(bpy.types.Operator):
     bl_idname = "sprite_baker.generate_directions"
-    bl_label = "Generate Directions"
+    bl_label = "生成方向"
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
@@ -84,7 +84,7 @@ class SBK_OT_generate_directions(bpy.types.Operator):
 
 class SBK_OT_remove_direction(bpy.types.Operator):
     bl_idname = "sprite_baker.remove_direction"
-    bl_label = "Remove Direction"
+    bl_label = "删除方向"
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
@@ -97,7 +97,7 @@ class SBK_OT_remove_direction(bpy.types.Operator):
 
 class SBK_OT_validate(bpy.types.Operator):
     bl_idname = "sprite_baker.validate"
-    bl_label = "Validate Sprite Bake"
+    bl_label = "检查烘焙配置"
     bl_options = {"REGISTER"}
 
     def execute(self, context):
@@ -106,13 +106,13 @@ class SBK_OT_validate(bpy.types.Operator):
             for error in errors:
                 self.report({"ERROR"}, error)
             return {"CANCELLED"}
-        self.report({"INFO"}, "Sprite Baker validation passed.")
+        self.report({"INFO"}, "精灵烘焙配置检查通过。")
         return {"FINISHED"}
 
 
 class SBK_OT_preview(bpy.types.Operator):
     bl_idname = "sprite_baker.preview"
-    bl_label = "Preview Current Frame"
+    bl_label = "预览当前帧"
     bl_options = {"REGISTER"}
 
     def execute(self, context):
@@ -125,15 +125,15 @@ class SBK_OT_preview(bpy.types.Operator):
             files = SpriteBaker(context).render_preview()
         except Exception as exc:
             traceback.print_exc()
-            self.report({"ERROR"}, f"Preview failed: {exc}")
+            self.report({"ERROR"}, f"预览失败：{exc}")
             return {"CANCELLED"}
-        self.report({"INFO"}, f"Preview written: {', '.join(files)}")
+        self.report({"INFO"}, f"预览已写入：{', '.join(files)}")
         return {"FINISHED"}
 
 
 class SBK_OT_export(bpy.types.Operator):
     bl_idname = "sprite_baker.export"
-    bl_label = "Export Sprite Sequences"
+    bl_label = "导出精灵序列"
     bl_options = {"REGISTER"}
 
     def execute(self, context):
@@ -146,9 +146,9 @@ class SBK_OT_export(bpy.types.Operator):
             count = SpriteBaker(context).export_all()
         except Exception as exc:
             traceback.print_exc()
-            self.report({"ERROR"}, f"Export failed: {exc}")
+            self.report({"ERROR"}, f"导出失败：{exc}")
             return {"CANCELLED"}
-        self.report({"INFO"}, f"Sprite Baker exported {count} frame pass files.")
+        self.report({"INFO"}, f"精灵烘焙已导出 {count} 个通道帧文件。")
         return {"FINISHED"}
 
 

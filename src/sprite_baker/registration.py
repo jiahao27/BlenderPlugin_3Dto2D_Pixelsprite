@@ -1,5 +1,6 @@
 import bpy
 
+from . import pixel_tools
 from .operators import (
     SBK_OT_add_action,
     SBK_OT_add_export_item,
@@ -55,6 +56,7 @@ CLASSES = (
     SBK_PT_passes,
     SBK_PT_mask_assignment,
     SBK_PT_preview_export,
+    *pixel_tools.CLASSES,
 )
 
 
@@ -62,9 +64,11 @@ def register():
     for cls in CLASSES:
         bpy.utils.register_class(cls)
     register_properties()
+    pixel_tools.register_properties()
 
 
 def unregister():
+    pixel_tools.unregister_properties()
     unregister_properties()
     for cls in reversed(CLASSES):
         bpy.utils.unregister_class(cls)

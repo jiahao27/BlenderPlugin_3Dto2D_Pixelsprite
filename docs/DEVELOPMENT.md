@@ -36,6 +36,12 @@ powershell -ExecutionPolicy Bypass -File scripts/run_blender_check.ps1
 powershell -ExecutionPolicy Bypass -File scripts/run_blender_smoke_test.ps1
 ```
 
+像素工具 smoke test：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/run_pixel_tools_smoke_test.ps1
+```
+
 后续还可以继续补充：
 
 - 自动复制插件到 Blender 用户插件目录的脚本。

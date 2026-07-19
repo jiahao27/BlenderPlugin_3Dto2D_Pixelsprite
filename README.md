@@ -1,6 +1,7 @@
 # Sprite Baker
 
 Sprite Baker 是一个 Blender 5.2 LTS 优先验证的多通道 Sprite 烘焙插件，用于将 3D 对象或动画批量导出为 Unity 2D/URP 友好的序列帧。
+插件同时包含中文界面的像素辅助工具：像素渲染设置、像素相机、视口像素预览、描边和像素材质。
 
 ## 项目结构
 
@@ -45,6 +46,9 @@ powershell -ExecutionPolicy Bypass -File scripts/run_blender_check.ps1
 
 # 用 Blender 后台模式跑一次真实导出 smoke test
 powershell -ExecutionPolicy Bypass -File scripts/run_blender_smoke_test.ps1
+
+# 用 Blender 后台模式跑像素工具 smoke test
+powershell -ExecutionPolicy Bypass -File scripts/run_pixel_tools_smoke_test.ps1
 ```
 
 更多开发建议见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。

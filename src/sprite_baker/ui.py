@@ -23,8 +23,8 @@ class SBK_UL_directions(bpy.types.UIList):
 
 class SBK_PT_project_settings(bpy.types.Panel):
     bl_idname = "SBK_PT_project_settings"
-    bl_label = "Project Settings"
-    bl_category = "Sprite Baker"
+    bl_label = "项目设置"
+    bl_category = "精灵烘焙"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
 
@@ -47,8 +47,8 @@ class SBK_PT_project_settings(bpy.types.Panel):
 
 class SBK_PT_export_items(bpy.types.Panel):
     bl_idname = "SBK_PT_export_items"
-    bl_label = "Export Items"
-    bl_category = "Sprite Baker"
+    bl_label = "导出项"
+    bl_category = "精灵烘焙"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_parent_id = "SBK_PT_project_settings"
@@ -73,7 +73,7 @@ class SBK_PT_export_items(bpy.types.Panel):
         buttons.operator("sprite_baker.remove_export_item", icon="REMOVE", text="")
 
         if item is None:
-            layout.label(text="Add an item to configure export targets.", icon="INFO")
+            layout.label(text="请先添加一个导出项。", icon="INFO")
             return
 
         box = layout.box()
@@ -129,8 +129,8 @@ class SBK_PT_export_items(bpy.types.Panel):
 
 class SBK_PT_passes(bpy.types.Panel):
     bl_idname = "SBK_PT_passes"
-    bl_label = "Passes"
-    bl_category = "Sprite Baker"
+    bl_label = "通道"
+    bl_category = "精灵烘焙"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_parent_id = "SBK_PT_project_settings"
@@ -145,8 +145,8 @@ class SBK_PT_passes(bpy.types.Panel):
 
 class SBK_PT_mask_assignment(bpy.types.Panel):
     bl_idname = "SBK_PT_mask_assignment"
-    bl_label = "Mask Assignment"
-    bl_category = "Sprite Baker"
+    bl_label = "遮罩分配"
+    bl_category = "精灵烘焙"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_parent_id = "SBK_PT_project_settings"
@@ -155,19 +155,19 @@ class SBK_PT_mask_assignment(bpy.types.Panel):
         layout = self.layout
         obj = context.object
         if obj is not None:
-            layout.label(text=f"Object: {obj.name}")
+            layout.label(text=f"物体：{obj.name}")
             draw_mask(layout, obj.sprite_baker_mask)
         mat = obj.active_material if obj is not None else None
         if mat is not None:
             layout.separator()
-            layout.label(text=f"Material: {mat.name}")
+            layout.label(text=f"材质：{mat.name}")
             draw_mask(layout, mat.sprite_baker_mask)
 
 
 class SBK_PT_preview_export(bpy.types.Panel):
     bl_idname = "SBK_PT_preview_export"
-    bl_label = "Preview & Export"
-    bl_category = "Sprite Baker"
+    bl_label = "预览与导出"
+    bl_category = "精灵烘焙"
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_parent_id = "SBK_PT_project_settings"
@@ -180,10 +180,10 @@ class SBK_PT_preview_export(bpy.types.Panel):
 
 
 def draw_mask(layout, mask):
-    layout.prop(mask, "enabled")
+    layout.prop(mask, "enabled", text="启用")
     row = layout.row(align=True)
     row.enabled = mask.enabled
-    row.prop(mask, "r")
-    row.prop(mask, "g")
-    row.prop(mask, "b")
-    row.prop(mask, "a")
+    row.prop(mask, "r", text="R")
+    row.prop(mask, "g", text="G")
+    row.prop(mask, "b", text="B")
+    row.prop(mask, "a", text="A")

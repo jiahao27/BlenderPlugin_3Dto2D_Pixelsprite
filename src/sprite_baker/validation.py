@@ -23,30 +23,30 @@ def validate_settings(context, preview=False):
     errors = []
 
     if not (settings.use_albedo or settings.use_normal or settings.use_mask):
-        errors.append("At least one pass must be enabled.")
+        errors.append("至少需要启用一个导出通道。")
 
     output_dir = Path(bpy.path.abspath(settings.output_dir))
     parent = output_dir if preview else output_dir.parent
     if not parent.exists():
-        errors.append(f"Output parent directory does not exist: {parent}")
+        errors.append(f"输出目录的上级目录不存在：{parent}")
 
     if settings.resolution_x <= 0 or settings.resolution_y <= 0:
-        errors.append("Resolution must be greater than zero.")
+        errors.append("分辨率必须大于 0。")
 
     if not settings.export_items:
-        errors.append("Add at least one export item.")
+        errors.append("请至少添加一个导出项。")
 
     for item in settings.export_items:
         objects = target_objects(item)
         if not objects:
-            errors.append(f"Export item '{item.name}' has no renderable target.")
+            errors.append(f"导出项“{item.name}”没有可渲染目标。")
         if item.animation_mode == "ACTIONS" and not any(slot.action for slot in item.actions):
-            errors.append(f"Export item '{item.name}' is in Actions mode but has no Action.")
+            errors.append(f"导出项“{item.name}”使用动作模式，但没有指定动作。")
         if item.direction_preset == "CUSTOM":
             try:
                 parse_custom_directions(item.custom_directions)
             except ValueError as exc:
-                errors.append(f"Export item '{item.name}' has invalid custom directions: {exc}")
+                errors.append(f"导出项“{item.name}”的自定义方向无效：{exc}")
 
     return errors
 
@@ -59,5 +59,5 @@ def parse_custom_directions(value):
             continue
         angles.append(float(text))
     if not angles:
-        raise ValueError("no angles provided")
+        raise ValueError("没有填写角度")
     return angles
