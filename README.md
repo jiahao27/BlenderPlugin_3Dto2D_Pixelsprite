@@ -29,7 +29,8 @@ python scripts/package_addon.py
 
 - 已在当前机器上找到 Python：可用 `python` 或具体路径运行脚本。
 - 当前命令行没有直接识别到 `git`，但常见路径中找到了 Git。仓库会使用找到的 Git 可执行文件初始化。
-- 当前命令行没有直接识别到 `blender`。如果需要自动安装、自动启动 Blender 或跑 Blender 内部测试，请提供 `blender.exe` 路径。
+- 已确认 Blender 路径：`E:\stream\steamapps\common\Blender\blender.exe`。
+- 已确认 Blender 版本：`Blender 5.2.0 LTS`。
 
 ## 常用命令
 
@@ -39,6 +40,9 @@ python scripts/package_addon.py
 
 # 探测 Python / Git / Blender
 powershell -ExecutionPolicy Bypass -File scripts/find_tools.ps1
+
+# 用 Blender 后台模式检查插件能否注册
+powershell -ExecutionPolicy Bypass -File scripts/run_blender_check.ps1
 ```
 
 更多开发建议见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。

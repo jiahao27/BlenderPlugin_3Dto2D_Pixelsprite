@@ -17,13 +17,19 @@
 
 ## 需要 Blender 路径时
 
-如果后续需要自动化测试或自动安装插件，请提供类似下面的路径：
+当前已确认 Blender 路径：
 
 ```text
-C:\Program Files\Blender Foundation\Blender 4.2\blender.exe
+E:\stream\steamapps\common\Blender\blender.exe
 ```
 
-拿到路径后，可以继续补充：
+可以运行下面的命令做 Blender 后台注册检查：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/run_blender_check.ps1
+```
+
+后续还可以继续补充：
 
 - 自动复制插件到 Blender 用户插件目录的脚本。
 - 使用 `blender.exe --background --python ...` 执行注册测试。
