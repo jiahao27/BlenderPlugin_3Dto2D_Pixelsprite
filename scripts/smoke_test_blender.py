@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import hashlib
 import json
 import shutil
 import sys
@@ -28,7 +29,7 @@ def main() -> None:
         clear_scene()
         cube = create_cube_scene()
         action = create_action(cube)
-        configure_camera_baker(cube, output_dir)
+        configure_camera_baker(cube, action, output_dir)
 
         from sprite_baker.baker import SpriteBaker
 
@@ -43,6 +44,10 @@ def main() -> None:
             raise RuntimeError(f"Expected multiple PNG files, found {len(pngs)}.")
         if not metadata:
             raise RuntimeError("metadata.json was not written.")
+        camera_albedo = sorted((output_dir / "Camera").rglob("*_Albedo.png"))
+        camera_hashes = {hashlib.sha256(path.read_bytes()).hexdigest() for path in camera_albedo}
+        if len(camera_albedo) > 1 and len(camera_hashes) == 1:
+            raise RuntimeError("Camera bake frames are identical; animation did not advance.")
 
         with metadata[0].open("r", encoding="utf-8") as handle:
             data = json.load(handle)
@@ -108,7 +113,7 @@ def reset_items(settings):
     settings.active_export_item_index = 0
 
 
-def configure_camera_baker(cube, output_dir):
+def configure_camera_baker(cube, action, output_dir):
     settings = bpy.context.scene.sprite_baker_settings
     settings.output_dir = str(output_dir)
     settings.resolution_x = 32
@@ -122,6 +127,8 @@ def configure_camera_baker(cube, output_dir):
     settings.bake_frame_count = 3
     settings.frame_start = 1
     settings.frame_end = 2
+    settings.camera_animation_target = cube
+    settings.camera_action = action
     settings.enable_pixel_bake = False
     reset_items(settings)
 

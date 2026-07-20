@@ -165,6 +165,17 @@ class SBK_Settings(bpy.types.PropertyGroup):
         default="VISIBLE_BAKE_CAMERA",
     )
     bake_camera: bpy.props.PointerProperty(name="烘焙相机", type=bpy.types.Object, poll=camera_poll)
+    camera_animation_target: bpy.props.PointerProperty(
+        name="动画对象",
+        description="相机烘焙时可选；角色动画通常选择骨架，物体关键帧动画选择物体本身",
+        type=bpy.types.Object,
+        poll=object_mask_poll,
+    )
+    camera_action: bpy.props.PointerProperty(
+        name="动作",
+        description="相机烘焙时可选；留空则使用当前时间轴/对象当前绑定的动作",
+        type=bpy.types.Action,
+    )
     margin: bpy.props.FloatProperty(name="自动构图边距", default=0.12, min=0.0, max=1.0)
     pixel_canvas_preset: bpy.props.EnumProperty(
         name="像素画布",

@@ -67,6 +67,11 @@ class SBK_PT_camera_frames(bpy.types.Panel):
             layout.prop(settings, "bake_frame_count")
         else:
             layout.prop(settings, "frame_step")
+        if settings.bake_mode == "CAMERA":
+            layout.separator()
+            layout.label(text="可选动画绑定")
+            layout.prop(settings, "camera_animation_target")
+            layout.prop(settings, "camera_action")
         if settings.bake_mode == "BATCH":
             layout.prop(settings, "margin")
             layout.prop(settings, "direction_strategy")

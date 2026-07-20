@@ -73,7 +73,8 @@ class SpriteBaker:
     def render_job(self, item, action_name, action, direction, frame, output_root, preview=False, output_frame=None):
         objects = target_objects(item)
         armature = item.armature
-        state_objects = list({obj for obj in objects + ([armature] if armature else []) if obj})
+        animation_target = self.animation_target_for_item(item)
+        state_objects = list({obj for obj in objects + ([armature] if armature else []) + ([animation_target] if animation_target else []) if obj})
         state = SceneState(self.scene, state_objects)
         files = []
         camera = None
@@ -83,6 +84,7 @@ class SpriteBaker:
             self.configure_pixel_compositor()
             self.apply_action(item, action)
             self.scene.frame_set(frame)
+            self.context.view_layer.update()
             bounds = object_bounds(objects)
             pivot = pivot_for_item(self.context, item, objects, bounds)
             if self.settings.direction_strategy == "ROTATE_TARGET":
@@ -172,17 +174,24 @@ class SpriteBaker:
         )
 
     def apply_action(self, item, action):
-        target = item.armature or item.target_object
-        if target is None:
+        target = self.animation_target_for_item(item)
+        if target is None or action is None:
             return
         target.animation_data_create()
         target.animation_data.action = action
+
+    def animation_target_for_item(self, item):
+        if self.settings.bake_mode == "CAMERA":
+            return self.settings.camera_animation_target
+        return item.armature or item.target_object
 
     def action_jobs(self, item):
         if self.settings.bake_mode == "CAMERA":
             start = self.settings.frame_start
             end = max(start, self.settings.frame_end)
-            return [("Camera", None, start, end)]
+            action = self.settings.camera_action
+            action_name = action.name if action is not None else "Camera"
+            return [(action_name, action, start, end)]
         if item.animation_mode == "STATIC":
             return [("Static", None, item.frame_start, max(item.frame_start, item.frame_end))]
 

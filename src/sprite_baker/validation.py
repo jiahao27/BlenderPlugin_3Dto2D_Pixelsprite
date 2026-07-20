@@ -41,6 +41,8 @@ def validate_settings(context, preview=False):
             errors.append("相机烘焙模式需要一个烘焙相机。请点击“创建/更新烘焙相机”。")
         if settings.frame_end < settings.frame_start:
             errors.append("结束帧不能小于起始帧。")
+        if settings.camera_action is not None and settings.camera_animation_target is None:
+            errors.append("相机烘焙指定了动作，但没有指定动画对象。")
         return errors
 
     if not settings.export_items:
