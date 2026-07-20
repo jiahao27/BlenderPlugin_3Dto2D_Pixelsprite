@@ -9,6 +9,10 @@ def armature_poll(self, obj):
     return obj is None or obj.type == "ARMATURE"
 
 
+def camera_poll(self, obj):
+    return obj is None or obj.type == "CAMERA"
+
+
 class SBK_MaskAssignment(bpy.types.PropertyGroup):
     enabled: bpy.props.BoolProperty(
         name="启用遮罩",
@@ -107,7 +111,25 @@ class SBK_Settings(bpy.types.PropertyGroup):
         ),
         default="ORTHO",
     )
+    camera_source: bpy.props.EnumProperty(
+        name="相机来源",
+        items=(
+            ("VISIBLE_BAKE_CAMERA", "可见烘焙相机", "使用场景中可见、可调整的烘焙相机"),
+            ("TEMP_AUTO_CAMERA", "临时自动相机", "导出时创建临时相机，结束后删除"),
+        ),
+        default="VISIBLE_BAKE_CAMERA",
+    )
+    bake_camera: bpy.props.PointerProperty(name="烘焙相机", type=bpy.types.Object, poll=camera_poll)
     margin: bpy.props.FloatProperty(name="边距", description="构图边距比例", default=0.12, min=0.0, max=1.0)
+    frame_sampling: bpy.props.EnumProperty(
+        name="帧采样",
+        items=(
+            ("FRAME_COUNT", "按烘焙帧数", "在动作范围内均匀采样指定数量的帧"),
+            ("FRAME_STEP", "按帧步长", "按起始帧、结束帧和帧步长导出"),
+        ),
+        default="FRAME_COUNT",
+    )
+    bake_frame_count: bpy.props.IntProperty(name="烘焙帧数", default=8, min=1, max=10000)
     frame_step: bpy.props.IntProperty(name="帧步长", default=1, min=1, max=100)
     direction_strategy: bpy.props.EnumProperty(
         name="方向策略",

@@ -39,10 +39,27 @@ class SBK_PT_project_settings(bpy.types.Panel):
         row.prop(settings, "resolution_y")
         col.prop(settings, "pixels_per_unit")
         col.prop(settings, "camera_mode")
+        col.prop(settings, "camera_source")
+        col.prop(settings, "bake_camera")
+        col.operator("sprite_baker.create_bake_camera", icon="CAMERA_DATA")
         col.prop(settings, "margin")
-        col.prop(settings, "frame_step")
+        col.prop(settings, "frame_sampling")
+        if settings.frame_sampling == "FRAME_COUNT":
+            col.prop(settings, "bake_frame_count")
+        else:
+            col.prop(settings, "frame_step")
         col.prop(settings, "direction_strategy")
         col.prop(settings, "unity_names")
+
+        if hasattr(context.scene, "sprite_baker_pixel_tools"):
+            pixel_settings = context.scene.sprite_baker_pixel_tools
+            box = layout.box()
+            box.label(text="烘焙相机像素设置")
+            box.prop(pixel_settings, "pixel_camera_type", text="相机类型")
+            box.prop(pixel_settings, "camera_projection", text="投影")
+            box.prop(pixel_settings, "camera_ortho_scale")
+            box.prop(pixel_settings, "iso_camera_distance")
+            box.prop(pixel_settings, "grid_opacity")
 
 
 class SBK_PT_export_items(bpy.types.Panel):
@@ -141,6 +158,16 @@ class SBK_PT_passes(bpy.types.Panel):
         layout.prop(settings, "use_albedo")
         layout.prop(settings, "use_normal")
         layout.prop(settings, "use_mask")
+        if hasattr(context.scene, "sprite_baker_pixel_tools"):
+            pixel_settings = context.scene.sprite_baker_pixel_tools
+            layout.separator()
+            layout.label(text="整体描边")
+            layout.prop(pixel_settings, "outline_thickness")
+            layout.prop(pixel_settings, "outline_color")
+            layout.prop(pixel_settings, "outline_background_color")
+            row = layout.row(align=True)
+            row.operator("sprite_baker.setup_outline", text="设置描边")
+            row.operator("sprite_baker.remove_outline", text="移除描边")
 
 
 class SBK_PT_mask_assignment(bpy.types.Panel):

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import bpy
 
-from .camera import configure_camera, make_camera, object_bounds, pivot_for_item, rotate_objects
+from .camera import configure_camera, make_camera, make_visible_bake_camera, object_bounds, pivot_for_item, rotate_objects
 from .materials import setup_albedo, setup_mask, setup_normal
 from .naming import PASS_LABELS, blend_abspath, frame_name, slugify
 from .state import SceneState, remove_temp_data
@@ -35,12 +35,21 @@ class SpriteBaker:
             for action_name, action, frame_start, frame_end in self.action_jobs(item):
                 metadata = []
                 for direction in item.directions:
-                    for frame in range(frame_start, frame_end + 1, self.settings.frame_step):
-                        files = self.render_job(item, action_name, action, direction, frame, output_root)
+                    for source_frame, output_frame in self.frame_jobs(frame_start, frame_end):
+                        files = self.render_job(
+                            item,
+                            action_name,
+                            action,
+                            direction,
+                            source_frame,
+                            output_root,
+                            output_frame=output_frame,
+                        )
                         written += len(files)
                         metadata.append(
                             {
-                                "frame": frame,
+                                "frame": output_frame,
+                                "source_frame": source_frame,
                                 "direction": direction.name,
                                 "direction_deg": direction.angle,
                                 "pass_files": files,
@@ -49,7 +58,7 @@ class SpriteBaker:
                 self.write_metadata(output_root, item, action_name, metadata)
         return written
 
-    def render_job(self, item, action_name, action, direction, frame, output_root, preview=False):
+    def render_job(self, item, action_name, action, direction, frame, output_root, preview=False, output_frame=None):
         objects = target_objects(item)
         armature = item.armature
         state_objects = list({obj for obj in objects + ([armature] if armature else []) if obj})
@@ -66,7 +75,11 @@ class SpriteBaker:
             if self.settings.direction_strategy == "ROTATE_TARGET":
                 rotate_objects(objects, pivot, direction.angle)
                 bounds = object_bounds(objects)
-            camera = make_camera(self.scene, self.settings)
+            if self.settings.camera_source == "VISIBLE_BAKE_CAMERA":
+                camera = make_visible_bake_camera(self.scene, self.settings)
+                self.apply_pixel_camera_settings(camera)
+            else:
+                camera = make_camera(self.scene, self.settings)
             _, scale = configure_camera(self.scene, camera, self.settings, bounds, direction.angle)
 
             original_materials = capture_materials(objects)
@@ -74,7 +87,7 @@ class SpriteBaker:
             for pass_id in pass_ids:
                 restore_material_slots(objects, original_materials)
                 self.setup_pass(objects, pass_id)
-                filepath = self.output_path(output_root, item, action_name, direction, frame, pass_id, preview)
+                filepath = self.output_path(output_root, item, action_name, direction, output_frame or frame, pass_id, preview)
                 filepath.parent.mkdir(parents=True, exist_ok=True)
                 self.scene.render.filepath = str(filepath)
                 bpy.ops.render.render(write_still=True)
@@ -117,6 +130,14 @@ class SpriteBaker:
             if obj.type == "MESH":
                 obj.hide_render = obj not in visible
 
+    def apply_pixel_camera_settings(self, camera):
+        if not hasattr(self.scene, "sprite_baker_pixel_tools"):
+            return
+        pixel_settings = self.scene.sprite_baker_pixel_tools
+        camera.data.type = pixel_settings.camera_projection
+        if camera.data.type == "ORTHO":
+            camera.data.ortho_scale = pixel_settings.camera_ortho_scale
+
     def apply_action(self, item, action):
         target = item.armature or item.target_object
         if target is None:
@@ -143,6 +164,21 @@ class SpriteBaker:
             jobs.append((action.name, action, frame_start, max(frame_start, frame_end)))
         return jobs
 
+    def frame_jobs(self, frame_start, frame_end):
+        if self.settings.frame_sampling == "FRAME_COUNT":
+            count = max(1, self.settings.bake_frame_count)
+            if count == 1:
+                return [(frame_start, 1)]
+            span = max(0, frame_end - frame_start)
+            return [
+                (int(round(frame_start + span * index / (count - 1))), index + 1)
+                for index in range(count)
+            ]
+        return [
+            (frame, frame)
+            for frame in range(frame_start, frame_end + 1, self.settings.frame_step)
+        ]
+
     def output_path(self, output_root, item, action_name, direction, frame, pass_id, preview):
         if preview:
             return output_root / PASS_LABELS[pass_id] / frame_name(
@@ -162,7 +198,7 @@ class SpriteBaker:
         action_root.mkdir(parents=True, exist_ok=True)
         data = {
             "frame_size": [self.settings.resolution_x, self.settings.resolution_y],
-            "frame_count": len({entry["frame"] for entry in frames}),
+            "frame_count": max((entry["frame"] for entry in frames), default=0),
             "pivot_px": [self.settings.resolution_x // 2, self.settings.resolution_y // 2],
             "pixels_per_unit": self.settings.pixels_per_unit,
             "item": item.name,

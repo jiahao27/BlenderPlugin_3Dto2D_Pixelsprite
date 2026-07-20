@@ -4,6 +4,7 @@ from . import pixel_tools
 from .operators import (
     SBK_OT_add_action,
     SBK_OT_add_export_item,
+    SBK_OT_create_bake_camera,
     SBK_OT_export,
     SBK_OT_generate_directions,
     SBK_OT_preview,
@@ -48,6 +49,7 @@ CLASSES = (
     SBK_OT_remove_action,
     SBK_OT_generate_directions,
     SBK_OT_remove_direction,
+    SBK_OT_create_bake_camera,
     SBK_OT_validate,
     SBK_OT_preview,
     SBK_OT_export,

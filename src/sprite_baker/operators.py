@@ -3,7 +3,9 @@ import traceback
 import bpy
 
 from .baker import SpriteBaker
-from .validation import get_active_item, parse_custom_directions, validate_settings
+from .camera import configure_camera, make_visible_bake_camera, object_bounds
+from .pixel_tools.grid_images import attach_grid_background
+from .validation import get_active_item, parse_custom_directions, target_objects, validate_settings
 
 
 class SBK_OT_add_export_item(bpy.types.Operator):
@@ -92,6 +94,50 @@ class SBK_OT_remove_direction(bpy.types.Operator):
         if item and item.directions:
             item.directions.remove(item.active_direction_index)
             item.active_direction_index = max(0, item.active_direction_index - 1)
+        return {"FINISHED"}
+
+
+class SBK_OT_create_bake_camera(bpy.types.Operator):
+    bl_idname = "sprite_baker.create_bake_camera"
+    bl_label = "创建/更新烘焙相机"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        settings = context.scene.sprite_baker_settings
+        item = get_active_item(settings)
+        if item is None:
+            self.report({"WARNING"}, "请先添加并选择一个导出项。")
+            return {"CANCELLED"}
+
+        objects = target_objects(item)
+        if not objects:
+            self.report({"WARNING"}, "当前导出项没有可用于构图的物体。")
+            return {"CANCELLED"}
+
+        camera = make_visible_bake_camera(context.scene, settings)
+        if hasattr(context.scene, "sprite_baker_pixel_tools"):
+            pixel_settings = context.scene.sprite_baker_pixel_tools
+            camera.data.type = pixel_settings.camera_projection
+            if camera.data.type == "ORTHO":
+                camera.data.ortho_scale = pixel_settings.camera_ortho_scale
+            attach_grid_background(
+                camera.data,
+                max(1, settings.resolution_x),
+                max(1, settings.resolution_y),
+                pixel_settings.grid_opacity,
+            )
+
+        bounds = object_bounds(objects)
+        angle = 0.0
+        if item.directions:
+            direction = item.directions[min(item.active_direction_index, len(item.directions) - 1)]
+            angle = direction.angle
+        _center, _scale = configure_camera(context.scene, camera, settings, bounds, angle)
+        settings.camera_source = "VISIBLE_BAKE_CAMERA"
+        settings.bake_camera = camera
+        camera.select_set(True)
+        context.view_layer.objects.active = camera
+        self.report({"INFO"}, f"烘焙相机已更新：{camera.name}")
         return {"FINISHED"}
 
 

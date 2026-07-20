@@ -32,6 +32,7 @@ def main() -> None:
 
         from sprite_baker.baker import SpriteBaker
 
+        bpy.ops.sprite_baker.create_bake_camera()
         count = SpriteBaker(bpy.context).export_all()
         if count <= 0:
             raise RuntimeError("No files were exported.")
@@ -95,6 +96,9 @@ def configure_baker(cube, action, output_dir):
     settings.use_normal = True
     settings.use_mask = True
     settings.direction_strategy = "ROTATE_TARGET"
+    settings.camera_source = "VISIBLE_BAKE_CAMERA"
+    settings.frame_sampling = "FRAME_COUNT"
+    settings.bake_frame_count = 3
     item = settings.export_items.add()
     item.name = "SmokeCube"
     item.target_type = "OBJECT"

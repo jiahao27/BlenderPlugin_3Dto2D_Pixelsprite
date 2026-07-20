@@ -14,6 +14,19 @@ def make_camera(scene, settings):
     return camera
 
 
+def make_visible_bake_camera(scene, settings):
+    camera = settings.bake_camera
+    if camera is None or camera.name not in bpy.data.objects:
+        data = bpy.data.cameras.new("SBK 可见烘焙相机")
+        camera = bpy.data.objects.new("SBK 可见烘焙相机", data)
+        scene.collection.objects.link(camera)
+        settings.bake_camera = camera
+    camera.data.type = "ORTHO" if settings.camera_mode == "ORTHO" else "PERSP"
+    camera.data.lens = 80
+    scene.camera = camera
+    return camera
+
+
 def look_at(camera, target):
     direction = Vector(target) - camera.location
     camera.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
