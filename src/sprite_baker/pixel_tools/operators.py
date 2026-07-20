@@ -16,11 +16,12 @@ class SBK_OT_setup_viewport_pixel_preview(bpy.types.Operator):
 
     def execute(self, context):
         settings = context.scene.sprite_baker_settings
+        preview_scale = active_preview_scale(settings)
         set_viewport_render_preview(context, rendered=True)
         try:
             setup_viewport_pixel_preview(
                 context.scene,
-                settings.pixel_preview_scale,
+                preview_scale,
                 settings.pixel_preview_offset_x,
                 settings.pixel_preview_offset_y,
             )
@@ -29,7 +30,7 @@ class SBK_OT_setup_viewport_pixel_preview(bpy.types.Operator):
             return {"CANCELLED"}
         set_viewport_pixel_transform(
             context.scene,
-            settings.pixel_preview_scale,
+            preview_scale,
             settings.pixel_preview_offset_x,
             settings.pixel_preview_offset_y,
         )
@@ -44,9 +45,10 @@ class SBK_OT_update_viewport_preview_resolution(bpy.types.Operator):
 
     def execute(self, context):
         settings = context.scene.sprite_baker_settings
+        preview_scale = active_preview_scale(settings)
         updated = set_viewport_pixel_transform(
             context.scene,
-            settings.pixel_preview_scale,
+            preview_scale,
             settings.pixel_preview_offset_x,
             settings.pixel_preview_offset_y,
         )
@@ -66,6 +68,12 @@ class SBK_OT_remove_viewport_pixel_preview(bpy.types.Operator):
         removed = remove_viewport_pixel_preview(context.scene)
         self.report({"INFO"}, f"已移除 {removed} 个像素预览节点。")
         return {"FINISHED"}
+
+
+def active_preview_scale(settings):
+    if settings.pixel_canvas_preset == "CUSTOM":
+        return settings.pixel_preview_scale
+    return 1.0
 
 
 CLASSES = (

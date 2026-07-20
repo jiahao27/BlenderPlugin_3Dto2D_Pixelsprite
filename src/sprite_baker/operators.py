@@ -4,7 +4,7 @@ import bpy
 
 from .baker import SpriteBaker
 from .camera import configure_camera, make_visible_bake_camera, object_bounds
-from .pixel_tools.grid_images import attach_grid_background
+from .pixel_tools.grid_images import attach_grid_background, clear_grid_backgrounds
 from .validation import get_active_item, parse_custom_directions, target_objects, validate_settings
 
 
@@ -113,17 +113,43 @@ class SBK_OT_create_bake_camera(bpy.types.Operator):
             self.report({"WARNING"}, "没有可用于构图的网格物体。")
             return {"CANCELLED"}
 
+        apply_pixel_canvas_preset(settings)
         camera = make_visible_bake_camera(context.scene, settings)
-        if hasattr(context.scene, "sprite_baker_pixel_tools"):
-            pixel_settings = context.scene.sprite_baker_pixel_tools
-            attach_grid_background(camera.data, max(1, settings.resolution_x), max(1, settings.resolution_y), pixel_settings.grid_opacity)
-
         configure_camera(context.scene, camera, settings, object_bounds(objects), 0.0)
+        attach_bake_camera_grid(camera, settings)
         settings.camera_source = "VISIBLE_BAKE_CAMERA"
         settings.bake_camera = camera
         camera.select_set(True)
         context.view_layer.objects.active = camera
         self.report({"INFO"}, f"烘焙相机已更新：{camera.name}")
+        return {"FINISHED"}
+
+
+class SBK_OT_refresh_pixel_grid(bpy.types.Operator):
+    bl_idname = "sprite_baker.refresh_pixel_grid"
+    bl_label = "刷新像素栅格"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        settings = context.scene.sprite_baker_settings
+        apply_pixel_canvas_preset(settings)
+        camera = settings.bake_camera or context.scene.camera
+        if camera is None or camera.type != "CAMERA":
+            self.report({"WARNING"}, "请先创建或指定烘焙相机。")
+            return {"CANCELLED"}
+        attach_bake_camera_grid(camera, settings)
+        self.report({"INFO"}, f"像素栅格已刷新：{settings.resolution_x} x {settings.resolution_y}")
+        return {"FINISHED"}
+
+
+class SBK_OT_clear_pixel_grid(bpy.types.Operator):
+    bl_idname = "sprite_baker.clear_pixel_grid"
+    bl_label = "清理像素栅格"
+    bl_options = {"REGISTER", "UNDO"}
+
+    def execute(self, context):
+        cleared = clear_grid_backgrounds()
+        self.report({"INFO"}, f"已清理 {cleared} 个像素栅格背景。")
         return {"FINISHED"}
 
 
@@ -182,6 +208,25 @@ class SBK_OT_export(bpy.types.Operator):
             return {"CANCELLED"}
         self.report({"INFO"}, f"已导出 {count} 个通道帧文件。")
         return {"FINISHED"}
+
+
+def apply_pixel_canvas_preset(settings):
+    if not settings.enable_pixel_bake or settings.pixel_canvas_preset == "CUSTOM":
+        return
+    size = int(settings.pixel_canvas_preset)
+    settings.resolution_x = size
+    settings.resolution_y = size
+    settings.pixel_preview_scale = 1.0
+
+
+def attach_bake_camera_grid(camera, settings):
+    attach_grid_background(
+        camera.data,
+        max(1, settings.resolution_x),
+        max(1, settings.resolution_y),
+        settings.pixel_grid_opacity,
+    )
+    camera.data.update_tag()
 
 
 def generate_directions_for_item(item):

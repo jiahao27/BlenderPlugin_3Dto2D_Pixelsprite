@@ -153,14 +153,29 @@ class SBK_PT_pixel_effect(bpy.types.Panel):
         layout.prop(settings, "enable_pixel_bake")
         col = layout.column(align=True)
         col.enabled = settings.enable_pixel_bake
-        col.prop(settings, "pixel_preview_scale")
-        row = col.row(align=True)
-        row.prop(settings, "pixel_preview_offset_x", text="X")
-        row.prop(settings, "pixel_preview_offset_y", text="Y")
+        col.prop(settings, "pixel_canvas_preset")
+        if settings.pixel_canvas_preset == "CUSTOM":
+            row = col.row(align=True)
+            row.prop(settings, "resolution_x")
+            row.prop(settings, "resolution_y")
+            col.prop(settings, "pixel_preview_scale")
+            row = col.row(align=True)
+            row.prop(settings, "pixel_preview_offset_x", text="X")
+            row.prop(settings, "pixel_preview_offset_y", text="Y")
+        else:
+            col.label(text=f"当前画布：{settings.resolution_x} x {settings.resolution_y}")
+        col.prop(settings, "pixel_grid_opacity")
+        grid_row = layout.row(align=True)
+        grid_row.enabled = settings.enable_pixel_bake
+        grid_row.operator("sprite_baker.refresh_pixel_grid", text="刷新栅格")
+        grid_row.operator("sprite_baker.clear_pixel_grid", text="清理栅格")
         row = layout.row(align=True)
+        row.enabled = settings.enable_pixel_bake
         row.operator("sprite_baker.setup_viewport_pixel_preview", text="设置像素预览")
         row.operator("sprite_baker.update_viewport_preview_resolution", text="更新")
-        layout.operator("sprite_baker.remove_viewport_pixel_preview", text="移除像素预览")
+        remove_row = layout.row()
+        remove_row.enabled = settings.enable_pixel_bake
+        remove_row.operator("sprite_baker.remove_viewport_pixel_preview", text="移除像素预览")
 
 
 class SBK_PT_passes(bpy.types.Panel):

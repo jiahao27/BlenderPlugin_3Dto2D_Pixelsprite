@@ -57,6 +57,11 @@ def main() -> None:
 
         configure_pixel_baker(cube, output_dir / "pixel")
         bpy.ops.sprite_baker.create_bake_camera()
+        settings = bpy.context.scene.sprite_baker_settings
+        if (settings.resolution_x, settings.resolution_y) != (64, 64):
+            raise RuntimeError("Pixel canvas preset did not update the bake resolution.")
+        if not settings.bake_camera or not settings.bake_camera.data.background_images:
+            raise RuntimeError("Pixel grid background was not attached to the bake camera.")
         pixel_count = SpriteBaker(bpy.context).export_all()
         if pixel_count <= 0:
             raise RuntimeError("Pixel mode exported no files.")
@@ -152,7 +157,8 @@ def configure_pixel_baker(cube, output_dir):
     settings.frame_sampling = "FRAME_COUNT"
     settings.bake_frame_count = 2
     settings.enable_pixel_bake = True
-    settings.pixel_preview_scale = 0.25
+    settings.pixel_canvas_preset = "64"
+    settings.pixel_grid_opacity = 0.42
     reset_items(settings)
 
 

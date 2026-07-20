@@ -88,11 +88,18 @@ class SpriteBaker:
             if self.settings.direction_strategy == "ROTATE_TARGET":
                 rotate_objects(objects, pivot, direction.angle)
                 bounds = object_bounds(objects)
-            if self.settings.bake_mode == "CAMERA" or self.settings.camera_source == "VISIBLE_BAKE_CAMERA":
-                camera = make_visible_bake_camera(self.scene, self.settings)
+            if self.settings.bake_mode == "CAMERA":
+                camera = self.settings.bake_camera or self.scene.camera
+                if camera is None or camera.type != "CAMERA":
+                    raise RuntimeError("相机烘焙需要一个烘焙相机。")
+                self.scene.camera = camera
+                scale = camera.data.ortho_scale if camera.data.type == "ORTHO" else 0.0
             else:
-                camera = make_camera(self.scene, self.settings)
-            _, scale = configure_camera(self.scene, camera, self.settings, bounds, direction.angle)
+                if self.settings.camera_source == "VISIBLE_BAKE_CAMERA":
+                    camera = make_visible_bake_camera(self.scene, self.settings)
+                else:
+                    camera = make_camera(self.scene, self.settings)
+                _, scale = configure_camera(self.scene, camera, self.settings, bounds, direction.angle)
 
             original_materials = capture_materials(objects)
             pass_ids = enabled_passes(self.settings)
@@ -128,12 +135,19 @@ class SpriteBaker:
             self.scene.render.engine = "BLENDER_EEVEE_NEXT"
         except TypeError:
             self.scene.render.engine = "BLENDER_EEVEE"
+        if self.settings.enable_pixel_bake and self.settings.pixel_canvas_preset != "CUSTOM":
+            size = int(self.settings.pixel_canvas_preset)
+            self.settings.resolution_x = size
+            self.settings.resolution_y = size
         self.scene.render.resolution_x = self.settings.resolution_x
         self.scene.render.resolution_y = self.settings.resolution_y
+        self.scene.render.resolution_percentage = 100
         self.scene.render.film_transparent = True
         self.scene.render.image_settings.file_format = "PNG"
         self.scene.render.image_settings.color_mode = "RGBA"
         self.scene.render.image_settings.color_depth = "8"
+        if hasattr(self.scene.render, "filter_size"):
+            self.scene.render.filter_size = 0.0
         self.scene.view_settings.view_transform = "Standard"
         self.scene.view_settings.look = "None"
         self.scene.view_settings.exposure = 0.0
@@ -147,9 +161,12 @@ class SpriteBaker:
     def configure_pixel_compositor(self):
         if not self.settings.enable_pixel_bake:
             return
+        preview_scale = 1.0
+        if self.settings.pixel_canvas_preset == "CUSTOM":
+            preview_scale = self.settings.pixel_preview_scale
         setup_viewport_pixel_preview(
             self.scene,
-            self.settings.pixel_preview_scale,
+            preview_scale,
             self.settings.pixel_preview_offset_x,
             self.settings.pixel_preview_offset_y,
         )

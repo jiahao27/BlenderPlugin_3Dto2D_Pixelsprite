@@ -11,6 +11,8 @@ class SceneState:
         self.filepath = scene.render.filepath
         self.resolution_x = scene.render.resolution_x
         self.resolution_y = scene.render.resolution_y
+        self.resolution_percentage = scene.render.resolution_percentage
+        self.filter_size = scene.render.filter_size if hasattr(scene.render, "filter_size") else None
         self.film_transparent = scene.render.film_transparent
         self.image_file_format = scene.render.image_settings.file_format
         self.image_color_mode = scene.render.image_settings.color_mode
@@ -40,6 +42,9 @@ class SceneState:
         self.scene.render.filepath = self.filepath
         self.scene.render.resolution_x = self.resolution_x
         self.scene.render.resolution_y = self.resolution_y
+        self.scene.render.resolution_percentage = self.resolution_percentage
+        if self.filter_size is not None and hasattr(self.scene.render, "filter_size"):
+            self.scene.render.filter_size = self.filter_size
         self.scene.render.film_transparent = self.film_transparent
         self.scene.render.image_settings.file_format = self.image_file_format
         self.scene.render.image_settings.color_mode = self.image_color_mode

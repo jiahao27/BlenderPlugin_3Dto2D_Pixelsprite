@@ -13,6 +13,58 @@ def camera_poll(self, obj):
     return obj is None or obj.type == "CAMERA"
 
 
+def update_pixel_preview_settings(self, context):
+    if context is None:
+        return
+    from .pixel_tools.viewport_preview import set_viewport_pixel_transform
+
+    set_viewport_pixel_transform(
+        context.scene,
+        self.pixel_preview_scale,
+        self.pixel_preview_offset_x,
+        self.pixel_preview_offset_y,
+    )
+
+
+def update_pixel_canvas_preset(self, context):
+    if context is None or self.pixel_canvas_preset == "CUSTOM":
+        return
+
+    size = int(self.pixel_canvas_preset)
+    self.resolution_x = size
+    self.resolution_y = size
+    self.pixel_preview_scale = 1.0
+
+    scene = context.scene
+    camera = self.bake_camera or scene.camera
+    if camera is not None and camera.type == "CAMERA":
+        from .pixel_tools.grid_images import attach_grid_background
+
+        attach_grid_background(camera.data, size, size, self.pixel_grid_opacity)
+        camera.data.update_tag()
+
+
+def update_pixel_grid_opacity(self, context):
+    if context is None:
+        return
+
+    scene = context.scene
+    camera = self.bake_camera or scene.camera
+    if camera is None or camera.type != "CAMERA":
+        return
+
+    from .pixel_tools.grid_images import attach_grid_background
+
+    attach_grid_background(camera.data, max(1, self.resolution_x), max(1, self.resolution_y), self.pixel_grid_opacity)
+    camera.data.update_tag()
+
+
+def update_enable_pixel_bake(self, context):
+    if not self.enable_pixel_bake:
+        return
+    update_pixel_canvas_preset(self, context)
+
+
 class SBK_MaskAssignment(bpy.types.PropertyGroup):
     enabled: bpy.props.BoolProperty(name="启用遮罩", description="为 MaskTex 通道使用这些 RGBA 权重", default=False)
     r: bpy.props.FloatProperty(name="红", default=0.0, min=0.0, max=1.0)
@@ -63,7 +115,7 @@ class SBK_ExportItem(bpy.types.PropertyGroup):
         ),
         default="SINGLE",
     )
-    custom_directions: bpy.props.StringProperty(name="自定义角度", description="例如：0,45,90", default="0")
+    custom_directions: bpy.props.StringProperty(name="自定义角度", description="例如 0,45,90", default="0")
     directions: bpy.props.CollectionProperty(type=SBK_DirectionSlot)
     active_direction_index: bpy.props.IntProperty(default=0, min=0)
     frame_start: bpy.props.IntProperty(name="起始帧", default=1, min=0)
@@ -114,6 +166,17 @@ class SBK_Settings(bpy.types.PropertyGroup):
     )
     bake_camera: bpy.props.PointerProperty(name="烘焙相机", type=bpy.types.Object, poll=camera_poll)
     margin: bpy.props.FloatProperty(name="自动构图边距", default=0.12, min=0.0, max=1.0)
+    pixel_canvas_preset: bpy.props.EnumProperty(
+        name="像素画布",
+        items=(
+            ("64", "64 x 64", "更粗颗粒"),
+            ("128", "128 x 128", "中等颗粒"),
+            ("256", "256 x 256", "更细颗粒"),
+            ("CUSTOM", "自定义", "使用手动宽度和高度"),
+        ),
+        default="128",
+        update=update_pixel_canvas_preset,
+    )
     frame_start: bpy.props.IntProperty(name="起始帧", default=1, min=0)
     frame_end: bpy.props.IntProperty(name="结束帧", default=1, min=0)
     frame_sampling: bpy.props.EnumProperty(
@@ -134,10 +197,38 @@ class SBK_Settings(bpy.types.PropertyGroup):
         ),
         default="ROTATE_TARGET",
     )
-    enable_pixel_bake: bpy.props.BoolProperty(name="启用像素烘焙", default=False)
-    pixel_preview_scale: bpy.props.FloatProperty(name="像素化比例", default=0.25, min=0.001, max=1.0, subtype="FACTOR")
-    pixel_preview_offset_x: bpy.props.FloatProperty(name="像素偏移 X", default=0.0, soft_min=-32.0, soft_max=32.0)
-    pixel_preview_offset_y: bpy.props.FloatProperty(name="像素偏移 Y", default=0.0, soft_min=-32.0, soft_max=32.0)
+    enable_pixel_bake: bpy.props.BoolProperty(name="启用像素烘焙", default=False, update=update_enable_pixel_bake)
+    pixel_preview_scale: bpy.props.FloatProperty(
+        name="像素颗粒度",
+        description="先缩小再放大的比例；越小颗粒越粗，越接近 1 越接近原图",
+        default=0.5,
+        min=0.001,
+        max=1.0,
+        subtype="FACTOR",
+        update=update_pixel_preview_settings,
+    )
+    pixel_preview_offset_x: bpy.props.FloatProperty(
+        name="像素偏移 X",
+        default=0.0,
+        soft_min=-32.0,
+        soft_max=32.0,
+        update=update_pixel_preview_settings,
+    )
+    pixel_preview_offset_y: bpy.props.FloatProperty(
+        name="像素偏移 Y",
+        default=0.0,
+        soft_min=-32.0,
+        soft_max=32.0,
+        update=update_pixel_preview_settings,
+    )
+    pixel_grid_opacity: bpy.props.FloatProperty(
+        name="栅格透明度",
+        default=0.35,
+        min=0.0,
+        max=1.0,
+        subtype="FACTOR",
+        update=update_pixel_grid_opacity,
+    )
     use_albedo: bpy.props.BoolProperty(name="Albedo", default=True)
     use_normal: bpy.props.BoolProperty(name="NormalMap", default=True)
     use_mask: bpy.props.BoolProperty(name="MaskTex", default=True)
