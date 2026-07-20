@@ -4,6 +4,7 @@ from pathlib import Path
 import bpy
 from mathutils import Vector
 
+from .atlas import build_sprite_atlas
 from .camera import configure_camera, make_camera, make_visible_bake_camera, object_bounds, pivot_for_item, rotate_objects
 from .materials import setup_albedo, setup_mask, setup_normal
 from .naming import PASS_LABELS, blend_abspath, frame_name, slugify
@@ -58,7 +59,8 @@ class SpriteBaker:
                                 "pass_files": files,
                             }
                         )
-                self.write_metadata(output_root, item, action_name, metadata)
+                atlas_files = self.write_atlases(output_root, item, action_name, metadata)
+                self.write_metadata(output_root, item, action_name, metadata, atlas_files)
         return written
 
     def export_items(self):
@@ -287,7 +289,35 @@ class SpriteBaker:
             / frame_name(self.settings, item.name, action_name, direction.name, frame, pass_id)
         )
 
-    def write_metadata(self, output_root, item, action_name, frames):
+    def write_atlases(self, output_root, item, action_name, frames):
+        if not self.settings.merge_atlas:
+            return []
+
+        atlas_files = []
+        for direction_name in sorted({entry["direction"] for entry in frames}):
+            direction_frames = [entry for entry in frames if entry["direction"] == direction_name]
+            for pass_id, pass_label in PASS_LABELS.items():
+                pass_files = [
+                    Path(file)
+                    for entry in direction_frames
+                    for file in entry["pass_files"]
+                    if len(Path(file).parts) >= 2 and Path(file).parts[-2] == pass_label
+                ]
+                if not pass_files:
+                    continue
+                source_paths = [output_root / file for file in pass_files]
+                atlas_name = f"{slugify(item.name)}_{slugify(action_name)}_{slugify(direction_name)}_{pass_label}_Atlas.png"
+                atlas_path = output_root / slugify(item.name) / slugify(action_name) / slugify(direction_name) / pass_label / atlas_name
+                atlas_info = build_sprite_atlas(source_paths, atlas_path)
+                if atlas_info is None:
+                    continue
+                atlas_info["file"] = str(atlas_path.relative_to(output_root))
+                atlas_info["pass"] = pass_label
+                atlas_info["direction"] = direction_name
+                atlas_files.append(atlas_info)
+        return atlas_files
+
+    def write_metadata(self, output_root, item, action_name, frames, atlas_files=None):
         action_root = output_root / slugify(item.name) / slugify(action_name)
         action_root.mkdir(parents=True, exist_ok=True)
         data = {
@@ -298,6 +328,7 @@ class SpriteBaker:
             "item": item.name,
             "action": action_name,
             "directions": frames,
+            "atlas_files": atlas_files or [],
         }
         with (action_root / "metadata.json").open("w", encoding="utf-8") as handle:
             json.dump(data, handle, indent=2, ensure_ascii=False)

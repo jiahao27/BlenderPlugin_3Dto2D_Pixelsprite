@@ -37,6 +37,7 @@ class SBK_PT_project_settings(bpy.types.Panel):
         layout.prop(settings, "bake_mode", expand=True)
         layout.prop(settings, "output_dir")
         layout.prop(settings, "naming_template")
+        layout.prop(settings, "merge_atlas")
         row = layout.row(align=True)
         row.prop(settings, "resolution_x")
         row.prop(settings, "resolution_y")

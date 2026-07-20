@@ -2,6 +2,8 @@ from pathlib import Path
 
 import bpy
 
+from .atlas import is_prime
+
 
 def get_active_item(settings):
     if not settings.export_items:
@@ -61,6 +63,53 @@ def validate_settings(context, preview=False):
                 errors.append(f"烘焙目标“{item.name}”的自定义方向无效：{exc}")
 
     return errors
+
+
+def atlas_warnings(context):
+    settings = context.scene.sprite_baker_settings
+    warnings = []
+
+    if settings.bake_mode == "CAMERA":
+        count = sampled_frame_count(settings, settings.frame_start, max(settings.frame_start, settings.frame_end))
+        if is_prime(count):
+            warnings.append(atlas_prime_message(settings, f"相机烘焙将导出 {count} 帧"))
+        return warnings
+
+    for item in settings.export_items:
+        if item.animation_mode == "STATIC":
+            count = sampled_frame_count(settings, item.frame_start, max(item.frame_start, item.frame_end))
+            if is_prime(count):
+                warnings.append(atlas_prime_message(settings, f"烘焙目标“{item.name}”的静态序列将导出 {count} 帧"))
+            continue
+
+        for slot in item.actions:
+            action = slot.action
+            if action is None:
+                continue
+            if item.use_action_frame_range:
+                start, end = action.frame_range
+                frame_start = int(round(start))
+                frame_end = int(round(end))
+            else:
+                frame_start = item.frame_start
+                frame_end = max(item.frame_start, item.frame_end)
+            count = sampled_frame_count(settings, frame_start, frame_end)
+            if is_prime(count):
+                warnings.append(atlas_prime_message(settings, f"动作“{action.name}”将导出 {count} 帧"))
+
+    return warnings
+
+
+def sampled_frame_count(settings, frame_start, frame_end):
+    if settings.frame_sampling == "FRAME_COUNT":
+        return max(1, settings.bake_frame_count)
+    return len(range(frame_start, frame_end + 1, settings.frame_step))
+
+
+def atlas_prime_message(settings, prefix):
+    if settings.merge_atlas:
+        return f"{prefix}；这是质数，无法按当前规则合并为大图，本次将只输出序列帧。"
+    return f"{prefix}；这是质数，之后难以按当前规则合并为大图。"
 
 
 def parse_custom_directions(value):

@@ -148,6 +148,11 @@ class SBK_Settings(bpy.types.PropertyGroup):
     pixels_per_unit: bpy.props.FloatProperty(name="每单位像素", default=100.0, min=0.01)
     output_dir: bpy.props.StringProperty(name="输出目录", subtype="DIR_PATH", default="//sprite_bake")
     naming_template: bpy.props.StringProperty(name="命名模板", default="{item}_{action}_{direction}_{frame}_{pass}")
+    merge_atlas: bpy.props.BoolProperty(
+        name="合并为大图",
+        description="导出序列帧后，按通道和方向生成对应 Sprite Sheet；质数帧数会跳过合并并给出提醒",
+        default=False,
+    )
     camera_mode: bpy.props.EnumProperty(
         name="相机模式",
         items=(

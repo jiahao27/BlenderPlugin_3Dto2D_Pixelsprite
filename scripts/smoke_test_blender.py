@@ -70,6 +70,9 @@ def main() -> None:
         pixel_count = SpriteBaker(bpy.context).export_all()
         if pixel_count <= 0:
             raise RuntimeError("Pixel mode exported no files.")
+        atlases = list((output_dir / "pixel").rglob("*_Atlas.png"))
+        if len(atlases) < 3:
+            raise RuntimeError("Sprite atlas files were not generated for all enabled passes.")
 
         print(f"Sprite Baker smoke test passed: {count + batch_count + pixel_count} files in {output_dir}")
     finally:
@@ -130,6 +133,7 @@ def configure_camera_baker(cube, action, output_dir):
     settings.camera_animation_target = cube
     settings.camera_action = action
     settings.enable_pixel_bake = False
+    settings.merge_atlas = False
     reset_items(settings)
 
 
@@ -141,6 +145,7 @@ def configure_batch_baker(cube, action, output_dir):
     settings.frame_sampling = "FRAME_COUNT"
     settings.bake_frame_count = 3
     settings.enable_pixel_bake = False
+    settings.merge_atlas = False
     reset_items(settings)
     item = settings.export_items.add()
     item.name = "SmokeCube"
@@ -162,10 +167,11 @@ def configure_pixel_baker(cube, output_dir):
     settings.frame_start = 1
     settings.frame_end = 2
     settings.frame_sampling = "FRAME_COUNT"
-    settings.bake_frame_count = 2
+    settings.bake_frame_count = 4
     settings.enable_pixel_bake = True
     settings.pixel_canvas_preset = "64"
     settings.pixel_grid_opacity = 0.42
+    settings.merge_atlas = True
     reset_items(settings)
 
 
