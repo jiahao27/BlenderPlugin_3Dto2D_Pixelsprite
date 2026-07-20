@@ -75,6 +75,7 @@ class SBK_PT_camera_frames(bpy.types.Panel):
         if settings.bake_mode == "BATCH":
             layout.prop(settings, "margin")
             layout.prop(settings, "direction_strategy")
+            layout.prop(settings, "batch_framing_mode")
 
 
 class SBK_PT_export_items(bpy.types.Panel):

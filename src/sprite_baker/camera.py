@@ -59,11 +59,13 @@ def configure_camera(scene, camera, settings, bounds, angle_deg=0.0):
 
 def object_bounds(objects):
     points = []
+    depsgraph = bpy.context.evaluated_depsgraph_get()
     for obj in objects:
         if obj.type != "MESH":
             continue
-        for corner in obj.bound_box:
-            points.append(obj.matrix_world @ Vector(corner))
+        evaluated = obj.evaluated_get(depsgraph)
+        for corner in evaluated.bound_box:
+            points.append(evaluated.matrix_world @ Vector(corner))
     if not points:
         return {"min": Vector((-0.5, -0.5, -0.5)), "max": Vector((0.5, 0.5, 0.5))}
     min_v = Vector((min(p.x for p in points), min(p.y for p in points), min(p.z for p in points)))

@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import bpy
+from mathutils import Vector
 
 from .camera import configure_camera, make_camera, make_visible_bake_camera, object_bounds, pivot_for_item, rotate_objects
 from .materials import setup_albedo, setup_mask, setup_normal
@@ -33,8 +34,10 @@ class SpriteBaker:
             ensure_directions(item)
             for action_name, action, frame_start, frame_end in self.action_jobs(item):
                 metadata = []
+                frame_jobs = self.frame_jobs(frame_start, frame_end)
+                fixed_framing = self.fixed_framing_for_action(item, action, item.directions, frame_jobs)
                 for direction in item.directions:
-                    for source_frame, output_frame in self.frame_jobs(frame_start, frame_end):
+                    for source_frame, output_frame in frame_jobs:
                         files = self.render_job(
                             item,
                             action_name,
@@ -43,6 +46,7 @@ class SpriteBaker:
                             source_frame,
                             output_root,
                             output_frame=output_frame,
+                            fixed_framing=fixed_framing,
                         )
                         written += len(files)
                         metadata.append(
@@ -70,7 +74,7 @@ class SpriteBaker:
             return CameraExportItem(self.context)
         raise RuntimeError("请先添加一个烘焙目标。")
 
-    def render_job(self, item, action_name, action, direction, frame, output_root, preview=False, output_frame=None):
+    def render_job(self, item, action_name, action, direction, frame, output_root, preview=False, output_frame=None, fixed_framing=None):
         objects = target_objects(item)
         armature = item.armature
         animation_target = self.animation_target_for_item(item)
@@ -86,10 +90,11 @@ class SpriteBaker:
             self.scene.frame_set(frame)
             self.context.view_layer.update()
             bounds = object_bounds(objects)
-            pivot = pivot_for_item(self.context, item, objects, bounds)
+            pivot = fixed_framing["pivot"] if fixed_framing else pivot_for_item(self.context, item, objects, bounds)
             if self.settings.direction_strategy == "ROTATE_TARGET":
                 rotate_objects(objects, pivot, direction.angle)
                 bounds = object_bounds(objects)
+            camera_bounds = fixed_framing["bounds"] if fixed_framing else bounds
             if self.settings.bake_mode == "CAMERA":
                 camera = self.settings.bake_camera or self.scene.camera
                 if camera is None or camera.type != "CAMERA":
@@ -101,7 +106,7 @@ class SpriteBaker:
                     camera = make_visible_bake_camera(self.scene, self.settings)
                 else:
                     camera = make_camera(self.scene, self.settings)
-                _, scale = configure_camera(self.scene, camera, self.settings, bounds, direction.angle)
+                _, scale = configure_camera(self.scene, camera, self.settings, camera_bounds, direction.angle)
 
             original_materials = capture_materials(objects)
             pass_ids = enabled_passes(self.settings)
@@ -185,6 +190,49 @@ class SpriteBaker:
             return self.settings.camera_animation_target
         return item.armature or item.target_object
 
+    def fixed_framing_for_action(self, item, action, directions, frame_jobs):
+        if self.settings.bake_mode != "BATCH" or self.settings.batch_framing_mode != "LOCK_ACTION":
+            return None
+
+        objects = target_objects(item)
+        armature = item.armature
+        state_objects = list({obj for obj in objects + ([armature] if armature else []) if obj})
+        state = SceneState(self.scene, state_objects)
+        base_points = []
+        rotated_points = []
+        try:
+            for source_frame, _output_frame in frame_jobs:
+                state.restore()
+                self.apply_action(item, action)
+                self.scene.frame_set(source_frame)
+                self.context.view_layer.update()
+                base_bounds = object_bounds(objects)
+                base_points.extend((base_bounds["min"].copy(), base_bounds["max"].copy()))
+
+            if not base_points:
+                return None
+
+            base_bounds = bounds_from_points(base_points)
+            fixed_pivot = pivot_for_item(self.context, item, objects, base_bounds)
+
+            for source_frame, _output_frame in frame_jobs:
+                for direction in directions:
+                    state.restore()
+                    self.apply_action(item, action)
+                    self.scene.frame_set(source_frame)
+                    self.context.view_layer.update()
+                    if self.settings.direction_strategy == "ROTATE_TARGET":
+                        rotate_objects(objects, fixed_pivot, direction.angle)
+                        self.context.view_layer.update()
+                    bounds = object_bounds(objects)
+                    rotated_points.extend((bounds["min"].copy(), bounds["max"].copy()))
+
+            if not rotated_points:
+                return None
+            return {"bounds": bounds_from_points(rotated_points), "pivot": fixed_pivot}
+        finally:
+            state.restore()
+
     def action_jobs(self, item):
         if self.settings.bake_mode == "CAMERA":
             start = self.settings.frame_start
@@ -264,6 +312,12 @@ def enabled_passes(settings):
     if settings.use_mask:
         passes.append("MASK")
     return passes
+
+
+def bounds_from_points(points):
+    min_v = Vector((min(p.x for p in points), min(p.y for p in points), min(p.z for p in points)))
+    max_v = Vector((max(p.x for p in points), max(p.y for p in points), max(p.z for p in points)))
+    return {"min": min_v, "max": max_v}
 
 
 def ensure_directions(item):

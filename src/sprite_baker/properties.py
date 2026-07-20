@@ -208,6 +208,14 @@ class SBK_Settings(bpy.types.PropertyGroup):
         ),
         default="ROTATE_TARGET",
     )
+    batch_framing_mode: bpy.props.EnumProperty(
+        name="构图方式",
+        items=(
+            ("LOCK_ACTION", "固定动作窗口", "先扫描整段动作和所有方向，使用最大边界烘焙整组序列"),
+            ("PER_FRAME", "逐帧自动构图", "每一帧单独计算相机窗口，可能导致动画大小跳动"),
+        ),
+        default="LOCK_ACTION",
+    )
     enable_pixel_bake: bpy.props.BoolProperty(name="启用像素烘焙", default=False, update=update_enable_pixel_bake)
     pixel_preview_scale: bpy.props.FloatProperty(
         name="像素颗粒度",
