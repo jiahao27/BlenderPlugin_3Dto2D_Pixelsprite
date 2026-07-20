@@ -3,6 +3,9 @@ import bpy
 from .validation import get_active_item
 
 
+CATEGORY = "精灵烘焙"
+
+
 class SBK_UL_export_items(bpy.types.UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         icon_name = "OUTLINER_OB_MESH" if item.target_type == "OBJECT" else "OUTLINER_COLLECTION"
@@ -23,49 +26,56 @@ class SBK_UL_directions(bpy.types.UIList):
 
 class SBK_PT_project_settings(bpy.types.Panel):
     bl_idname = "SBK_PT_project_settings"
-    bl_label = "项目设置"
-    bl_category = "精灵烘焙"
+    bl_label = "烘焙模式"
+    bl_category = CATEGORY
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
 
     def draw(self, context):
         settings = context.scene.sprite_baker_settings
         layout = self.layout
-        col = layout.column(align=True)
-        col.prop(settings, "output_dir")
-        col.prop(settings, "naming_template")
-        row = col.row(align=True)
+        layout.prop(settings, "bake_mode", expand=True)
+        layout.prop(settings, "output_dir")
+        layout.prop(settings, "naming_template")
+        row = layout.row(align=True)
         row.prop(settings, "resolution_x")
         row.prop(settings, "resolution_y")
-        col.prop(settings, "pixels_per_unit")
-        col.prop(settings, "camera_mode")
-        col.prop(settings, "camera_source")
-        col.prop(settings, "bake_camera")
-        col.operator("sprite_baker.create_bake_camera", icon="CAMERA_DATA")
-        col.prop(settings, "margin")
-        col.prop(settings, "frame_sampling")
-        if settings.frame_sampling == "FRAME_COUNT":
-            col.prop(settings, "bake_frame_count")
-        else:
-            col.prop(settings, "frame_step")
-        col.prop(settings, "direction_strategy")
-        col.prop(settings, "unity_names")
+        layout.prop(settings, "pixels_per_unit")
 
-        if hasattr(context.scene, "sprite_baker_pixel_tools"):
-            pixel_settings = context.scene.sprite_baker_pixel_tools
-            box = layout.box()
-            box.label(text="烘焙相机像素设置")
-            box.prop(pixel_settings, "pixel_camera_type", text="相机类型")
-            box.prop(pixel_settings, "camera_projection", text="投影")
-            box.prop(pixel_settings, "camera_ortho_scale")
-            box.prop(pixel_settings, "iso_camera_distance")
-            box.prop(pixel_settings, "grid_opacity")
+
+class SBK_PT_camera_frames(bpy.types.Panel):
+    bl_idname = "SBK_PT_camera_frames"
+    bl_label = "相机与帧范围"
+    bl_category = CATEGORY
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_parent_id = "SBK_PT_project_settings"
+
+    def draw(self, context):
+        settings = context.scene.sprite_baker_settings
+        layout = self.layout
+        layout.prop(settings, "camera_mode")
+        if settings.bake_mode == "BATCH":
+            layout.prop(settings, "camera_source")
+        layout.prop(settings, "bake_camera")
+        layout.operator("sprite_baker.create_bake_camera", icon="CAMERA_DATA")
+        row = layout.row(align=True)
+        row.prop(settings, "frame_start")
+        row.prop(settings, "frame_end")
+        layout.prop(settings, "frame_sampling")
+        if settings.frame_sampling == "FRAME_COUNT":
+            layout.prop(settings, "bake_frame_count")
+        else:
+            layout.prop(settings, "frame_step")
+        if settings.bake_mode == "BATCH":
+            layout.prop(settings, "margin")
+            layout.prop(settings, "direction_strategy")
 
 
 class SBK_PT_export_items(bpy.types.Panel):
     bl_idname = "SBK_PT_export_items"
-    bl_label = "导出项"
-    bl_category = "精灵烘焙"
+    bl_label = "烘焙目标"
+    bl_category = CATEGORY
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_parent_id = "SBK_PT_project_settings"
@@ -74,6 +84,10 @@ class SBK_PT_export_items(bpy.types.Panel):
         settings = context.scene.sprite_baker_settings
         item = get_active_item(settings)
         layout = self.layout
+
+        if settings.bake_mode == "CAMERA":
+            layout.label(text="相机模式下，导出项是可选的对象过滤器。", icon="INFO")
+            layout.label(text="没有导出项时，会烘焙场景中可渲染的网格。")
 
         row = layout.row()
         row.template_list(
@@ -90,7 +104,6 @@ class SBK_PT_export_items(bpy.types.Panel):
         buttons.operator("sprite_baker.remove_export_item", icon="REMOVE", text="")
 
         if item is None:
-            layout.label(text="请先添加一个导出项。", icon="INFO")
             return
 
         box = layout.box()
@@ -99,55 +112,61 @@ class SBK_PT_export_items(bpy.types.Panel):
             box.prop(item, "target_object")
         else:
             box.prop(item, "target_collection")
-        box.prop(item, "armature")
-        box.prop(item, "animation_mode")
 
-        if item.animation_mode == "ACTIONS":
-            action_row = box.row()
-            action_row.template_list(
-                "SBK_UL_actions",
-                "",
-                item,
-                "actions",
-                item,
-                "active_action_index",
-                rows=3,
-            )
-            action_buttons = action_row.column(align=True)
-            action_buttons.operator("sprite_baker.add_action", icon="ADD", text="")
-            action_buttons.operator("sprite_baker.remove_action", icon="REMOVE", text="")
-            box.prop(item, "use_action_frame_range")
+        if settings.bake_mode == "BATCH":
+            box.prop(item, "armature")
+            box.prop(item, "animation_mode")
+            if item.animation_mode == "ACTIONS":
+                action_row = box.row()
+                action_row.template_list("SBK_UL_actions", "", item, "actions", item, "active_action_index", rows=3)
+                action_buttons = action_row.column(align=True)
+                action_buttons.operator("sprite_baker.add_action", icon="ADD", text="")
+                action_buttons.operator("sprite_baker.remove_action", icon="REMOVE", text="")
+                box.prop(item, "use_action_frame_range")
+            frame_row = box.row(align=True)
+            frame_row.prop(item, "frame_start")
+            frame_row.prop(item, "frame_end")
+            box.prop(item, "pivot_mode")
+            if item.pivot_mode == "CUSTOM":
+                box.prop(item, "custom_pivot")
+            dir_box = layout.box()
+            dir_box.prop(item, "direction_preset")
+            if item.direction_preset == "CUSTOM":
+                dir_box.prop(item, "custom_directions")
+            dir_box.operator("sprite_baker.generate_directions", icon="FILE_REFRESH")
+            dir_row = dir_box.row()
+            dir_row.template_list("SBK_UL_directions", "", item, "directions", item, "active_direction_index", rows=3)
+            dir_row.column(align=True).operator("sprite_baker.remove_direction", icon="REMOVE", text="")
 
-        frame_row = box.row(align=True)
-        frame_row.prop(item, "frame_start")
-        frame_row.prop(item, "frame_end")
-        box.prop(item, "pivot_mode")
-        if item.pivot_mode == "CUSTOM":
-            box.prop(item, "custom_pivot")
 
-        dir_box = layout.box()
-        dir_box.prop(item, "direction_preset")
-        if item.direction_preset == "CUSTOM":
-            dir_box.prop(item, "custom_directions")
-        dir_box.operator("sprite_baker.generate_directions", icon="FILE_REFRESH")
-        dir_row = dir_box.row()
-        dir_row.template_list(
-            "SBK_UL_directions",
-            "",
-            item,
-            "directions",
-            item,
-            "active_direction_index",
-            rows=3,
-        )
-        dir_buttons = dir_row.column(align=True)
-        dir_buttons.operator("sprite_baker.remove_direction", icon="REMOVE", text="")
+class SBK_PT_pixel_effect(bpy.types.Panel):
+    bl_idname = "SBK_PT_pixel_effect"
+    bl_label = "像素烘焙效果"
+    bl_category = CATEGORY
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_parent_id = "SBK_PT_project_settings"
+
+    def draw(self, context):
+        settings = context.scene.sprite_baker_settings
+        layout = self.layout
+        layout.prop(settings, "enable_pixel_bake")
+        col = layout.column(align=True)
+        col.enabled = settings.enable_pixel_bake
+        col.prop(settings, "pixel_preview_scale")
+        row = col.row(align=True)
+        row.prop(settings, "pixel_preview_offset_x", text="X")
+        row.prop(settings, "pixel_preview_offset_y", text="Y")
+        row = layout.row(align=True)
+        row.operator("sprite_baker.setup_viewport_pixel_preview", text="设置像素预览")
+        row.operator("sprite_baker.update_viewport_preview_resolution", text="更新")
+        layout.operator("sprite_baker.remove_viewport_pixel_preview", text="移除像素预览")
 
 
 class SBK_PT_passes(bpy.types.Panel):
     bl_idname = "SBK_PT_passes"
-    bl_label = "通道"
-    bl_category = "精灵烘焙"
+    bl_label = "通道输出"
+    bl_category = CATEGORY
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_parent_id = "SBK_PT_project_settings"
@@ -158,22 +177,13 @@ class SBK_PT_passes(bpy.types.Panel):
         layout.prop(settings, "use_albedo")
         layout.prop(settings, "use_normal")
         layout.prop(settings, "use_mask")
-        if hasattr(context.scene, "sprite_baker_pixel_tools"):
-            pixel_settings = context.scene.sprite_baker_pixel_tools
-            layout.separator()
-            layout.label(text="整体描边")
-            layout.prop(pixel_settings, "outline_thickness")
-            layout.prop(pixel_settings, "outline_color")
-            layout.prop(pixel_settings, "outline_background_color")
-            row = layout.row(align=True)
-            row.operator("sprite_baker.setup_outline", text="设置描边")
-            row.operator("sprite_baker.remove_outline", text="移除描边")
+        layout.prop(settings, "unity_names")
 
 
 class SBK_PT_mask_assignment(bpy.types.Panel):
     bl_idname = "SBK_PT_mask_assignment"
     bl_label = "遮罩分配"
-    bl_category = "精灵烘焙"
+    bl_category = CATEGORY
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_parent_id = "SBK_PT_project_settings"
@@ -194,7 +204,7 @@ class SBK_PT_mask_assignment(bpy.types.Panel):
 class SBK_PT_preview_export(bpy.types.Panel):
     bl_idname = "SBK_PT_preview_export"
     bl_label = "预览与导出"
-    bl_category = "精灵烘焙"
+    bl_category = CATEGORY
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_parent_id = "SBK_PT_project_settings"

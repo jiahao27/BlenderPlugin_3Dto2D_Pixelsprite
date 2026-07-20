@@ -72,17 +72,13 @@ def _create_toon_material():
     nodes = material.node_tree.nodes
     nodes.clear()
     principled = nodes.new("ShaderNodeBsdfPrincipled")
-    principled.location = (-400, 0)
     _set_node_input(principled, "Base Color", (0.5, 0.5, 0.5, 1.0))
     _set_node_input(principled, "Metallic", 0.0)
     _set_node_input(principled, "Roughness", 0.5)
     shader_to_rgb = nodes.new("ShaderNodeShaderToRGB")
-    shader_to_rgb.location = (-120, 0)
     ramp = nodes.new("ShaderNodeValToRGB")
-    ramp.location = (120, 0)
     ramp.color_ramp.interpolation = "CONSTANT"
     output = nodes.new("ShaderNodeOutputMaterial")
-    output.location = (380, 0)
     material.node_tree.links.new(principled.outputs["BSDF"], shader_to_rgb.inputs["Shader"])
     material.node_tree.links.new(shader_to_rgb.outputs["Color"], ramp.inputs["Fac"])
     material.node_tree.links.new(ramp.outputs["Color"], output.inputs["Surface"])
@@ -156,10 +152,10 @@ class SBK_OT_create_pixel_material(bpy.types.Operator):
         else:
             material = _create_image_pixel_material()
         assigned_count, skipped_count = _assign_material_to_selection(targets, material, settings.material_assignment_mode)
-        msg = f"已创建 {material.name}，并分配给 {assigned_count} 个物体。"
+        message = f"已创建 {material.name}，并分配给 {assigned_count} 个物体。"
         if skipped_count > 0:
-            msg += f" 跳过 {skipped_count} 个未支持对象。"
-        self.report({"INFO"}, msg)
+            message += f" 跳过 {skipped_count} 个未支持对象。"
+        self.report({"INFO"}, message)
         return {"FINISHED"}
 
 

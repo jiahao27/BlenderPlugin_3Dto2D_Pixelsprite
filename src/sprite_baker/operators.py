@@ -10,7 +10,7 @@ from .validation import get_active_item, parse_custom_directions, target_objects
 
 class SBK_OT_add_export_item(bpy.types.Operator):
     bl_idname = "sprite_baker.add_export_item"
-    bl_label = "添加导出项"
+    bl_label = "添加烘焙目标"
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
@@ -26,7 +26,7 @@ class SBK_OT_add_export_item(bpy.types.Operator):
 
 class SBK_OT_remove_export_item(bpy.types.Operator):
     bl_idname = "sprite_baker.remove_export_item"
-    bl_label = "删除导出项"
+    bl_label = "删除烘焙目标"
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
@@ -105,34 +105,20 @@ class SBK_OT_create_bake_camera(bpy.types.Operator):
     def execute(self, context):
         settings = context.scene.sprite_baker_settings
         item = get_active_item(settings)
-        if item is None:
-            self.report({"WARNING"}, "请先添加并选择一个导出项。")
-            return {"CANCELLED"}
-
-        objects = target_objects(item)
+        if item is not None:
+            objects = target_objects(item)
+        else:
+            objects = [obj for obj in context.scene.objects if obj.type == "MESH" and not obj.hide_render]
         if not objects:
-            self.report({"WARNING"}, "当前导出项没有可用于构图的物体。")
+            self.report({"WARNING"}, "没有可用于构图的网格物体。")
             return {"CANCELLED"}
 
         camera = make_visible_bake_camera(context.scene, settings)
         if hasattr(context.scene, "sprite_baker_pixel_tools"):
             pixel_settings = context.scene.sprite_baker_pixel_tools
-            camera.data.type = pixel_settings.camera_projection
-            if camera.data.type == "ORTHO":
-                camera.data.ortho_scale = pixel_settings.camera_ortho_scale
-            attach_grid_background(
-                camera.data,
-                max(1, settings.resolution_x),
-                max(1, settings.resolution_y),
-                pixel_settings.grid_opacity,
-            )
+            attach_grid_background(camera.data, max(1, settings.resolution_x), max(1, settings.resolution_y), pixel_settings.grid_opacity)
 
-        bounds = object_bounds(objects)
-        angle = 0.0
-        if item.directions:
-            direction = item.directions[min(item.active_direction_index, len(item.directions) - 1)]
-            angle = direction.angle
-        _center, _scale = configure_camera(context.scene, camera, settings, bounds, angle)
+        configure_camera(context.scene, camera, settings, object_bounds(objects), 0.0)
         settings.camera_source = "VISIBLE_BAKE_CAMERA"
         settings.bake_camera = camera
         camera.select_set(True)
@@ -152,7 +138,7 @@ class SBK_OT_validate(bpy.types.Operator):
             for error in errors:
                 self.report({"ERROR"}, error)
             return {"CANCELLED"}
-        self.report({"INFO"}, "精灵烘焙配置检查通过。")
+        self.report({"INFO"}, "烘焙配置检查通过。")
         return {"FINISHED"}
 
 
@@ -194,7 +180,7 @@ class SBK_OT_export(bpy.types.Operator):
             traceback.print_exc()
             self.report({"ERROR"}, f"导出失败：{exc}")
             return {"CANCELLED"}
-        self.report({"INFO"}, f"精灵烘焙已导出 {count} 个通道帧文件。")
+        self.report({"INFO"}, f"已导出 {count} 个通道帧文件。")
         return {"FINISHED"}
 
 

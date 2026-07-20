@@ -14,11 +14,7 @@ def camera_poll(self, obj):
 
 
 class SBK_MaskAssignment(bpy.types.PropertyGroup):
-    enabled: bpy.props.BoolProperty(
-        name="启用遮罩",
-        description="为 MaskTex 通道使用这些 RGBA 权重",
-        default=False,
-    )
+    enabled: bpy.props.BoolProperty(name="启用遮罩", description="为 MaskTex 通道使用这些 RGBA 权重", default=False)
     r: bpy.props.FloatProperty(name="红", default=0.0, min=0.0, max=1.0)
     g: bpy.props.FloatProperty(name="绿", default=0.0, min=0.0, max=1.0)
     b: bpy.props.FloatProperty(name="蓝", default=0.0, min=0.0, max=1.0)
@@ -37,10 +33,10 @@ class SBK_DirectionSlot(bpy.types.PropertyGroup):
 class SBK_ExportItem(bpy.types.PropertyGroup):
     name: bpy.props.StringProperty(name="名称", default="Sprite")
     target_type: bpy.props.EnumProperty(
-        name="导出目标类型",
+        name="目标类型",
         items=(
-            ("OBJECT", "物体", "导出一个物体"),
-            ("COLLECTION", "集合", "导出集合中的可渲染网格物体"),
+            ("OBJECT", "物体", "烘焙一个物体"),
+            ("COLLECTION", "集合", "烘焙集合中的网格物体"),
         ),
         default="OBJECT",
     )
@@ -50,8 +46,8 @@ class SBK_ExportItem(bpy.types.PropertyGroup):
     animation_mode: bpy.props.EnumProperty(
         name="动画模式",
         items=(
-            ("STATIC", "静态", "将当前帧导出为静态精灵"),
-            ("ACTIONS", "动作", "导出列表中的每个动作"),
+            ("STATIC", "静态", "按帧范围烘焙当前场景状态"),
+            ("ACTIONS", "动作", "按 Action 列表批量烘焙"),
         ),
         default="STATIC",
     )
@@ -62,32 +58,24 @@ class SBK_ExportItem(bpy.types.PropertyGroup):
         items=(
             ("SINGLE", "单方向", "仅 0 度"),
             ("FOUR", "4 向", "0、90、180、270 度"),
-            ("EIGHT", "8 向", "八个均匀分布方向"),
-            ("CUSTOM", "自定义", "用逗号分隔自定义角度"),
+            ("EIGHT", "8 向", "八个均匀方向"),
+            ("CUSTOM", "自定义", "用逗号分隔角度"),
         ),
         default="SINGLE",
     )
-    custom_directions: bpy.props.StringProperty(
-        name="自定义角度",
-        description="逗号分隔的角度，例如：0,45,90",
-        default="0",
-    )
+    custom_directions: bpy.props.StringProperty(name="自定义角度", description="例如：0,45,90", default="0")
     directions: bpy.props.CollectionProperty(type=SBK_DirectionSlot)
     active_direction_index: bpy.props.IntProperty(default=0, min=0)
     frame_start: bpy.props.IntProperty(name="起始帧", default=1, min=0)
     frame_end: bpy.props.IntProperty(name="结束帧", default=1, min=0)
-    use_action_frame_range: bpy.props.BoolProperty(
-        name="使用动作帧范围",
-        description="使用所选动作的帧范围，而不是项目自定义范围",
-        default=True,
-    )
+    use_action_frame_range: bpy.props.BoolProperty(name="使用动作帧范围", default=True)
     pivot_mode: bpy.props.EnumProperty(
         name="支点",
         items=(
-            ("AUTO", "自动边界", "使用计算边界中心"),
+            ("AUTO", "自动边界", "使用目标边界中心"),
             ("ORIGIN", "物体原点", "使用目标物体原点"),
             ("CURSOR", "3D 游标", "使用场景游标"),
-            ("CUSTOM", "自定义", "使用自定义世界坐标支点"),
+            ("CUSTOM", "自定义", "使用自定义世界坐标"),
         ),
         default="AUTO",
     )
@@ -95,18 +83,23 @@ class SBK_ExportItem(bpy.types.PropertyGroup):
 
 
 class SBK_Settings(bpy.types.PropertyGroup):
+    bake_mode: bpy.props.EnumProperty(
+        name="烘焙模式",
+        items=(
+            ("CAMERA", "相机烘焙", "摄像机看到什么就烘焙什么"),
+            ("BATCH", "批量动作烘焙", "按目标、动作、方向批量烘焙"),
+        ),
+        default="CAMERA",
+    )
     resolution_x: bpy.props.IntProperty(name="宽度", default=128, min=1, max=8192)
     resolution_y: bpy.props.IntProperty(name="高度", default=128, min=1, max=8192)
     pixels_per_unit: bpy.props.FloatProperty(name="每单位像素", default=100.0, min=0.01)
     output_dir: bpy.props.StringProperty(name="输出目录", subtype="DIR_PATH", default="//sprite_bake")
-    naming_template: bpy.props.StringProperty(
-        name="命名模板",
-        default="{item}_{action}_{direction}_{frame}_{pass}",
-    )
+    naming_template: bpy.props.StringProperty(name="命名模板", default="{item}_{action}_{direction}_{frame}_{pass}")
     camera_mode: bpy.props.EnumProperty(
         name="相机模式",
         items=(
-            ("ORTHO", "正交", "正交精灵相机"),
+            ("ORTHO", "正交", "正交相机"),
             ("WEAK_PERSPECTIVE", "弱透视", "长焦透视相机"),
         ),
         default="ORTHO",
@@ -115,16 +108,18 @@ class SBK_Settings(bpy.types.PropertyGroup):
         name="相机来源",
         items=(
             ("VISIBLE_BAKE_CAMERA", "可见烘焙相机", "使用场景中可见、可调整的烘焙相机"),
-            ("TEMP_AUTO_CAMERA", "临时自动相机", "导出时创建临时相机，结束后删除"),
+            ("TEMP_AUTO_CAMERA", "临时自动相机", "批量动作烘焙时自动创建临时相机"),
         ),
         default="VISIBLE_BAKE_CAMERA",
     )
     bake_camera: bpy.props.PointerProperty(name="烘焙相机", type=bpy.types.Object, poll=camera_poll)
-    margin: bpy.props.FloatProperty(name="边距", description="构图边距比例", default=0.12, min=0.0, max=1.0)
+    margin: bpy.props.FloatProperty(name="自动构图边距", default=0.12, min=0.0, max=1.0)
+    frame_start: bpy.props.IntProperty(name="起始帧", default=1, min=0)
+    frame_end: bpy.props.IntProperty(name="结束帧", default=1, min=0)
     frame_sampling: bpy.props.EnumProperty(
         name="帧采样",
         items=(
-            ("FRAME_COUNT", "按烘焙帧数", "在动作范围内均匀采样指定数量的帧"),
+            ("FRAME_COUNT", "按烘焙帧数", "在帧范围内均匀采样指定数量"),
             ("FRAME_STEP", "按帧步长", "按起始帧、结束帧和帧步长导出"),
         ),
         default="FRAME_COUNT",
@@ -135,10 +130,14 @@ class SBK_Settings(bpy.types.PropertyGroup):
         name="方向策略",
         items=(
             ("ROTATE_TARGET", "旋转目标", "固定相机并旋转导出物体"),
-            ("CAMERA_ORBIT", "环绕相机", "固定物体并让临时相机环绕"),
+            ("CAMERA_ORBIT", "环绕相机", "固定物体并让相机环绕"),
         ),
         default="ROTATE_TARGET",
     )
+    enable_pixel_bake: bpy.props.BoolProperty(name="启用像素烘焙", default=False)
+    pixel_preview_scale: bpy.props.FloatProperty(name="像素化比例", default=0.25, min=0.001, max=1.0, subtype="FACTOR")
+    pixel_preview_offset_x: bpy.props.FloatProperty(name="像素偏移 X", default=0.0, soft_min=-32.0, soft_max=32.0)
+    pixel_preview_offset_y: bpy.props.FloatProperty(name="像素偏移 Y", default=0.0, soft_min=-32.0, soft_max=32.0)
     use_albedo: bpy.props.BoolProperty(name="Albedo", default=True)
     use_normal: bpy.props.BoolProperty(name="NormalMap", default=True)
     use_mask: bpy.props.BoolProperty(name="MaskTex", default=True)

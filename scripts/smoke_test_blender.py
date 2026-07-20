@@ -28,7 +28,7 @@ def main() -> None:
         clear_scene()
         cube = create_cube_scene()
         action = create_action(cube)
-        configure_baker(cube, action, output_dir)
+        configure_camera_baker(cube, output_dir)
 
         from sprite_baker.baker import SpriteBaker
 
@@ -50,7 +50,18 @@ def main() -> None:
             if key not in data:
                 raise RuntimeError(f"metadata.json missing key: {key}")
 
-        print(f"Sprite Baker smoke test passed: {count} files in {output_dir}")
+        configure_batch_baker(cube, action, output_dir / "batch")
+        batch_count = SpriteBaker(bpy.context).export_all()
+        if batch_count <= 0:
+            raise RuntimeError("Batch mode exported no files.")
+
+        configure_pixel_baker(cube, output_dir / "pixel")
+        bpy.ops.sprite_baker.create_bake_camera()
+        pixel_count = SpriteBaker(bpy.context).export_all()
+        if pixel_count <= 0:
+            raise RuntimeError("Pixel mode exported no files.")
+
+        print(f"Sprite Baker smoke test passed: {count + batch_count + pixel_count} files in {output_dir}")
     finally:
         addon.unregister()
 
@@ -87,18 +98,38 @@ def create_action(obj):
     return action
 
 
-def configure_baker(cube, action, output_dir):
+def reset_items(settings):
+    settings.export_items.clear()
+    settings.active_export_item_index = 0
+
+
+def configure_camera_baker(cube, output_dir):
     settings = bpy.context.scene.sprite_baker_settings
     settings.output_dir = str(output_dir)
     settings.resolution_x = 32
     settings.resolution_y = 32
+    settings.bake_mode = "CAMERA"
     settings.use_albedo = True
     settings.use_normal = True
     settings.use_mask = True
-    settings.direction_strategy = "ROTATE_TARGET"
     settings.camera_source = "VISIBLE_BAKE_CAMERA"
     settings.frame_sampling = "FRAME_COUNT"
     settings.bake_frame_count = 3
+    settings.frame_start = 1
+    settings.frame_end = 2
+    settings.enable_pixel_bake = False
+    reset_items(settings)
+
+
+def configure_batch_baker(cube, action, output_dir):
+    settings = bpy.context.scene.sprite_baker_settings
+    settings.output_dir = str(output_dir)
+    settings.bake_mode = "BATCH"
+    settings.direction_strategy = "ROTATE_TARGET"
+    settings.frame_sampling = "FRAME_COUNT"
+    settings.bake_frame_count = 3
+    settings.enable_pixel_bake = False
+    reset_items(settings)
     item = settings.export_items.add()
     item.name = "SmokeCube"
     item.target_type = "OBJECT"
@@ -110,6 +141,19 @@ def configure_baker(cube, action, output_dir):
     from sprite_baker.operators import generate_directions_for_item
 
     generate_directions_for_item(item)
+
+
+def configure_pixel_baker(cube, output_dir):
+    settings = bpy.context.scene.sprite_baker_settings
+    settings.output_dir = str(output_dir)
+    settings.bake_mode = "CAMERA"
+    settings.frame_start = 1
+    settings.frame_end = 2
+    settings.frame_sampling = "FRAME_COUNT"
+    settings.bake_frame_count = 2
+    settings.enable_pixel_bake = True
+    settings.pixel_preview_scale = 0.25
+    reset_items(settings)
 
 
 if __name__ == "__main__":

@@ -4,7 +4,6 @@ from . import materials, operators, properties, ui
 CLASSES = (
     *properties.CLASSES,
     *operators.CLASSES,
-    *ui.CLASSES,
 )
 
 

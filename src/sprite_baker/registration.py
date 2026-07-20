@@ -23,9 +23,11 @@ from .properties import (
     unregister_properties,
 )
 from .ui import (
+    SBK_PT_camera_frames,
     SBK_PT_export_items,
     SBK_PT_mask_assignment,
     SBK_PT_passes,
+    SBK_PT_pixel_effect,
     SBK_PT_preview_export,
     SBK_PT_project_settings,
     SBK_UL_actions,
@@ -54,7 +56,9 @@ CLASSES = (
     SBK_OT_preview,
     SBK_OT_export,
     SBK_PT_project_settings,
+    SBK_PT_camera_frames,
     SBK_PT_export_items,
+    SBK_PT_pixel_effect,
     SBK_PT_passes,
     SBK_PT_mask_assignment,
     SBK_PT_preview_export,

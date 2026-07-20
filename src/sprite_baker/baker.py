@@ -6,6 +6,7 @@ import bpy
 from .camera import configure_camera, make_camera, make_visible_bake_camera, object_bounds, pivot_for_item, rotate_objects
 from .materials import setup_albedo, setup_mask, setup_normal
 from .naming import PASS_LABELS, blend_abspath, frame_name, slugify
+from .pixel_tools.viewport_preview import remove_viewport_pixel_preview, setup_viewport_pixel_preview
 from .state import SceneState, remove_temp_data
 from .validation import get_active_item, target_objects
 
@@ -17,9 +18,7 @@ class SpriteBaker:
         self.settings = self.scene.sprite_baker_settings
 
     def render_preview(self):
-        item = get_active_item(self.settings)
-        if item is None:
-            return []
+        item = self.preview_item()
         ensure_directions(item)
         action_name, action, frame_start, _frame_end = self.action_jobs(item)[0]
         direction = item.directions[min(item.active_direction_index, len(item.directions) - 1)]
@@ -30,7 +29,7 @@ class SpriteBaker:
         output_root = blend_abspath(self.settings.output_dir, bpy)
         output_root.mkdir(parents=True, exist_ok=True)
         written = 0
-        for item in self.settings.export_items:
+        for item in self.export_items():
             ensure_directions(item)
             for action_name, action, frame_start, frame_end in self.action_jobs(item):
                 metadata = []
@@ -58,6 +57,19 @@ class SpriteBaker:
                 self.write_metadata(output_root, item, action_name, metadata)
         return written
 
+    def export_items(self):
+        if self.settings.bake_mode == "CAMERA" and not self.settings.export_items:
+            return [CameraExportItem(self.context)]
+        return list(self.settings.export_items)
+
+    def preview_item(self):
+        item = get_active_item(self.settings)
+        if item is not None:
+            return item
+        if self.settings.bake_mode == "CAMERA":
+            return CameraExportItem(self.context)
+        raise RuntimeError("请先添加一个烘焙目标。")
+
     def render_job(self, item, action_name, action, direction, frame, output_root, preview=False, output_frame=None):
         objects = target_objects(item)
         armature = item.armature
@@ -68,6 +80,7 @@ class SpriteBaker:
         try:
             remove_temp_data()
             self.configure_scene_for_render(objects)
+            self.configure_pixel_compositor()
             self.apply_action(item, action)
             self.scene.frame_set(frame)
             bounds = object_bounds(objects)
@@ -75,9 +88,8 @@ class SpriteBaker:
             if self.settings.direction_strategy == "ROTATE_TARGET":
                 rotate_objects(objects, pivot, direction.angle)
                 bounds = object_bounds(objects)
-            if self.settings.camera_source == "VISIBLE_BAKE_CAMERA":
+            if self.settings.bake_mode == "CAMERA" or self.settings.camera_source == "VISIBLE_BAKE_CAMERA":
                 camera = make_visible_bake_camera(self.scene, self.settings)
-                self.apply_pixel_camera_settings(camera)
             else:
                 camera = make_camera(self.scene, self.settings)
             _, scale = configure_camera(self.scene, camera, self.settings, bounds, direction.angle)
@@ -99,6 +111,8 @@ class SpriteBaker:
             return files
         finally:
             state.restore()
+            if self.settings.enable_pixel_bake:
+                remove_viewport_pixel_preview(self.scene)
             remove_temp_data()
 
     def setup_pass(self, objects, pass_id):
@@ -130,13 +144,15 @@ class SpriteBaker:
             if obj.type == "MESH":
                 obj.hide_render = obj not in visible
 
-    def apply_pixel_camera_settings(self, camera):
-        if not hasattr(self.scene, "sprite_baker_pixel_tools"):
+    def configure_pixel_compositor(self):
+        if not self.settings.enable_pixel_bake:
             return
-        pixel_settings = self.scene.sprite_baker_pixel_tools
-        camera.data.type = pixel_settings.camera_projection
-        if camera.data.type == "ORTHO":
-            camera.data.ortho_scale = pixel_settings.camera_ortho_scale
+        setup_viewport_pixel_preview(
+            self.scene,
+            self.settings.pixel_preview_scale,
+            self.settings.pixel_preview_offset_x,
+            self.settings.pixel_preview_offset_y,
+        )
 
     def apply_action(self, item, action):
         target = item.armature or item.target_object
@@ -146,8 +162,12 @@ class SpriteBaker:
         target.animation_data.action = action
 
     def action_jobs(self, item):
+        if self.settings.bake_mode == "CAMERA":
+            start = self.settings.frame_start
+            end = max(start, self.settings.frame_end)
+            return [("Camera", None, start, end)]
         if item.animation_mode == "STATIC":
-            return [("Static", None, self.scene.frame_current, self.scene.frame_current)]
+            return [("Static", None, item.frame_start, max(item.frame_start, item.frame_end))]
 
         jobs = []
         for slot in item.actions:
@@ -223,6 +243,8 @@ def enabled_passes(settings):
 def ensure_directions(item):
     if item.directions:
         return
+    if not hasattr(item.directions, "clear"):
+        return
     from .operators import generate_directions_for_item
 
     generate_directions_for_item(item)
@@ -246,3 +268,30 @@ def restore_material_slots(objects, original_materials):
         obj.data.materials.clear()
         for mat in original_materials[obj]:
             obj.data.materials.append(mat)
+
+
+class CameraExportItem:
+    name = "Camera"
+    target_type = "SCENE"
+    target_object = None
+    target_collection = None
+    armature = None
+    animation_mode = "STATIC"
+    actions = ()
+    direction_preset = "SINGLE"
+    custom_directions = "0"
+    use_action_frame_range = False
+    pivot_mode = "AUTO"
+    custom_pivot = (0.0, 0.0, 0.0)
+
+    def __init__(self, context):
+        self.context = context
+        settings = context.scene.sprite_baker_settings
+        self.frame_start = settings.frame_start
+        self.frame_end = settings.frame_end
+        self.directions = [CameraDirection()]
+
+
+class CameraDirection:
+    name = "camera"
+    angle = 0.0

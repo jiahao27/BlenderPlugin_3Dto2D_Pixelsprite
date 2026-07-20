@@ -23,29 +23,24 @@ def main() -> None:
         cube.select_set(True)
         bpy.context.view_layer.objects.active = cube
 
-        settings = bpy.context.scene.sprite_baker_pixel_tools
-        settings.resolution_preset = "32"
-        bpy.ops.sprite_baker.apply_render_settings()
-        bpy.ops.sprite_baker.create_front_pixel_camera()
-        settings.pixel_camera_type = "ISO"
-        bpy.ops.sprite_baker.create_selected_pixel_camera()
-        bpy.ops.sprite_baker.cleanup_grid_images()
+        pixel_settings = bpy.context.scene.sprite_baker_pixel_tools
+        pixel_settings.resolution_preset = "32"
+        bpy.context.scene.render.resolution_x = 32
+        bpy.context.scene.render.resolution_y = 32
 
         for material_type in ("FLAT", "FLAT_UV", "TOON", "IMAGE_PIXEL"):
-            settings.material_type = material_type
+            pixel_settings.material_type = material_type
             bpy.ops.sprite_baker.create_pixel_material()
 
-        bpy.ops.sprite_baker.setup_outline()
-        bpy.ops.sprite_baker.remove_outline()
+        settings = bpy.context.scene.sprite_baker_settings
+        settings.enable_pixel_bake = True
+        settings.pixel_preview_scale = 0.25
         bpy.ops.sprite_baker.setup_viewport_pixel_preview()
+        bpy.ops.sprite_baker.update_viewport_preview_resolution()
         bpy.ops.sprite_baker.remove_viewport_pixel_preview()
 
         if not bpy.data.materials.get("SBK 平面色"):
             raise RuntimeError("像素材质没有创建成功。")
-        if not any(camera.name.startswith("SBK 正面") for camera in bpy.data.objects if camera.type == "CAMERA"):
-            raise RuntimeError("正面像素相机没有创建成功。")
-        if not any(camera.name.startswith("SBK 等距") for camera in bpy.data.objects if camera.type == "CAMERA"):
-            raise RuntimeError("等距像素相机没有创建成功。")
 
         print("Sprite Baker pixel tools smoke test passed.")
     finally:
