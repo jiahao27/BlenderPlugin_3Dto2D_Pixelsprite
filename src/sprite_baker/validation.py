@@ -45,6 +45,11 @@ def validate_settings(context, preview=False):
             errors.append("结束帧不能小于起始帧。")
         if settings.camera_action is not None and settings.camera_animation_target is None:
             errors.append("相机烘焙指定了动作，但没有指定动画对象。")
+        if settings.direction_preset == "CUSTOM":
+            try:
+                parse_custom_directions(settings.custom_directions)
+            except ValueError as exc:
+                errors.append(f"相机烘焙的自定义方向无效：{exc}")
         return errors
 
     if not settings.export_items:

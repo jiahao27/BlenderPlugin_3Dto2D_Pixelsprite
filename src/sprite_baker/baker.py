@@ -65,23 +65,33 @@ class SpriteBaker:
         return written
 
     def export_items(self):
-        if self.settings.bake_mode == "CAMERA" and not self.settings.export_items:
-            return [CameraExportItem(self.context)]
+        if self.settings.bake_mode == "CAMERA":
+            if not self.settings.export_items:
+                return [CameraExportItem(self.context)]
+            return [CameraExportItem(self.context, source_item=item) for item in self.settings.export_items]
         return list(self.settings.export_items)
 
     def preview_item(self):
         item = get_active_item(self.settings)
+        if self.settings.bake_mode == "CAMERA":
+            return CameraExportItem(self.context, source_item=item)
         if item is not None:
             return item
-        if self.settings.bake_mode == "CAMERA":
-            return CameraExportItem(self.context)
         raise RuntimeError("请先添加一个烘焙目标。")
 
     def render_job(self, item, action_name, action, direction, frame, output_root, preview=False, output_frame=None, fixed_framing=None):
         objects = target_objects(item)
         armature = item.armature
         animation_target = self.animation_target_for_item(item)
-        state_objects = list({obj for obj in objects + ([armature] if armature else []) + ([animation_target] if animation_target else []) if obj})
+        state_objects = list({
+            obj
+            for obj in objects
+            + ([armature] if armature else [])
+            + ([animation_target] if animation_target else [])
+            + ([self.settings.bake_camera] if self.settings.bake_camera else [])
+            + ([self.scene.camera] if self.scene.camera else [])
+            if obj
+        })
         state = SceneState(self.scene, state_objects)
         files = []
         camera = None
@@ -103,6 +113,8 @@ class SpriteBaker:
                 if camera is None or camera.type != "CAMERA":
                     raise RuntimeError("相机烘焙需要一个烘焙相机。")
                 self.scene.camera = camera
+                if direction.angle:
+                    rotate_objects([camera], pivot, direction.angle)
                 scale = camera.data.ortho_scale if camera.data.type == "ORTHO" else 0.0
             else:
                 if self.settings.camera_source == "VISIBLE_BAKE_CAMERA":
@@ -385,27 +397,23 @@ def restore_material_slots(objects, original_materials):
 
 
 class CameraExportItem:
-    name = "Camera"
-    target_type = "SCENE"
-    target_object = None
-    target_collection = None
     armature = None
     animation_mode = "STATIC"
     actions = ()
-    direction_preset = "SINGLE"
-    custom_directions = "0"
     use_action_frame_range = False
     pivot_mode = "AUTO"
     custom_pivot = (0.0, 0.0, 0.0)
 
-    def __init__(self, context):
+    def __init__(self, context, source_item=None):
         self.context = context
         settings = context.scene.sprite_baker_settings
+        self.name = source_item.name if source_item else "Camera"
+        self.target_type = source_item.target_type if source_item else "SCENE"
+        self.target_object = source_item.target_object if source_item else None
+        self.target_collection = source_item.target_collection if source_item else None
         self.frame_start = settings.frame_start
         self.frame_end = settings.frame_end
-        self.directions = [CameraDirection()]
-
-
-class CameraDirection:
-    name = "camera"
-    angle = 0.0
+        self.direction_preset = settings.direction_preset
+        self.custom_directions = settings.custom_directions
+        self.directions = settings.directions
+        self.active_direction_index = settings.active_direction_index

@@ -213,6 +213,19 @@ class SBK_Settings(bpy.types.PropertyGroup):
         ),
         default="ROTATE_TARGET",
     )
+    direction_preset: bpy.props.EnumProperty(
+        name="相机烘焙方向",
+        items=(
+            ("SINGLE", "单方向", "保持当前相机视角"),
+            ("FOUR", "4 向", "围绕当前构图每 90 度旋转相机"),
+            ("EIGHT", "8 向", "围绕当前构图每 45 度旋转相机"),
+            ("CUSTOM", "自定义", "用逗号分隔相机旋转角度"),
+        ),
+        default="SINGLE",
+    )
+    custom_directions: bpy.props.StringProperty(name="自定义相机角度", description="例如 0,45,90", default="0")
+    directions: bpy.props.CollectionProperty(type=SBK_DirectionSlot)
+    active_direction_index: bpy.props.IntProperty(default=0, min=0)
     batch_framing_mode: bpy.props.EnumProperty(
         name="构图方式",
         items=(

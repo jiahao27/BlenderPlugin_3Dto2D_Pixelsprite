@@ -34,6 +34,7 @@ def main() -> None:
         from sprite_baker.baker import SpriteBaker
 
         bpy.ops.sprite_baker.create_bake_camera()
+        bpy.ops.sprite_baker.generate_directions()
         count = SpriteBaker(bpy.context).export_all()
         if count <= 0:
             raise RuntimeError("No files were exported.")
@@ -44,6 +45,9 @@ def main() -> None:
             raise RuntimeError(f"Expected multiple PNG files, found {len(pngs)}.")
         if not metadata:
             raise RuntimeError("metadata.json was not written.")
+        camera_directions = {path.parent.parent.name for path in (output_dir / "Camera").rglob("*_NormalMap.png")}
+        if camera_directions != {"dir_000", "dir_090", "dir_180", "dir_270"}:
+            raise RuntimeError(f"Camera bake directions were not exported: {camera_directions}")
         camera_albedo = sorted((output_dir / "Camera").rglob("*_Albedo.png"))
         camera_hashes = {hashlib.sha256(path.read_bytes()).hexdigest() for path in camera_albedo}
         if len(camera_albedo) > 1 and len(camera_hashes) == 1:
@@ -128,6 +132,7 @@ def configure_camera_baker(cube, action, output_dir):
     settings.normal_map_edge_padding = True
     settings.use_mask = True
     settings.camera_source = "VISIBLE_BAKE_CAMERA"
+    settings.direction_preset = "FOUR"
     settings.frame_sampling = "FRAME_COUNT"
     settings.bake_frame_count = 3
     settings.frame_start = 1
@@ -174,6 +179,8 @@ def configure_pixel_baker(cube, output_dir):
     settings.pixel_canvas_preset = "64"
     settings.pixel_grid_opacity = 0.42
     settings.merge_atlas = True
+    settings.direction_preset = "SINGLE"
+    bpy.ops.sprite_baker.generate_directions()
     reset_items(settings)
 
 

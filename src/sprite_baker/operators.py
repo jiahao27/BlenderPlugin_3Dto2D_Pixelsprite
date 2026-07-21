@@ -73,11 +73,11 @@ class SBK_OT_generate_directions(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
-        item = get_active_item(context.scene.sprite_baker_settings)
-        if item is None:
+        owner = get_direction_owner(context.scene.sprite_baker_settings)
+        if owner is None:
             return {"CANCELLED"}
         try:
-            generate_directions_for_item(item)
+            generate_directions_for_item(owner)
         except ValueError as exc:
             self.report({"ERROR"}, str(exc))
             return {"CANCELLED"}
@@ -90,10 +90,10 @@ class SBK_OT_remove_direction(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
-        item = get_active_item(context.scene.sprite_baker_settings)
-        if item and item.directions:
-            item.directions.remove(item.active_direction_index)
-            item.active_direction_index = max(0, item.active_direction_index - 1)
+        owner = get_direction_owner(context.scene.sprite_baker_settings)
+        if owner and owner.directions:
+            owner.directions.remove(owner.active_direction_index)
+            owner.active_direction_index = max(0, owner.active_direction_index - 1)
         return {"FINISHED"}
 
 
@@ -250,3 +250,9 @@ def generate_directions_for_item(item):
         slot.angle = normalized
         slot.name = f"dir_{int(round(normalized)):03d}"
     item.active_direction_index = 0
+
+
+def get_direction_owner(settings):
+    if settings.bake_mode == "CAMERA":
+        return settings
+    return get_active_item(settings)

@@ -73,6 +73,23 @@ class SBK_PT_camera_frames(bpy.types.Panel):
             layout.label(text="可选动画绑定")
             layout.prop(settings, "camera_animation_target")
             layout.prop(settings, "camera_action")
+            layout.separator()
+            layout.label(text="相机方向")
+            layout.prop(settings, "direction_preset")
+            if settings.direction_preset == "CUSTOM":
+                layout.prop(settings, "custom_directions")
+            layout.operator("sprite_baker.generate_directions", icon="FILE_REFRESH")
+            direction_row = layout.row()
+            direction_row.template_list(
+                "SBK_UL_directions",
+                "",
+                settings,
+                "directions",
+                settings,
+                "active_direction_index",
+                rows=3,
+            )
+            direction_row.column(align=True).operator("sprite_baker.remove_direction", icon="REMOVE", text="")
         if settings.bake_mode == "BATCH":
             layout.prop(settings, "margin")
             layout.prop(settings, "direction_strategy")
