@@ -8,6 +8,7 @@ from .atlas import build_sprite_atlas
 from .camera import configure_camera, make_camera, make_visible_bake_camera, object_bounds, pivot_for_item, rotate_objects
 from .materials import setup_albedo, setup_mask, setup_normal
 from .naming import PASS_LABELS, blend_abspath, frame_name, slugify
+from .normal_map import expand_transparent_edge
 from .pixel_tools.viewport_preview import remove_viewport_pixel_preview, setup_viewport_pixel_preview
 from .state import SceneState, remove_temp_data
 from .validation import get_active_item, target_objects
@@ -119,6 +120,8 @@ class SpriteBaker:
                 filepath.parent.mkdir(parents=True, exist_ok=True)
                 self.scene.render.filepath = str(filepath)
                 bpy.ops.render.render(write_still=True)
+                if pass_id == "NORMAL" and self.settings.normal_map_edge_padding:
+                    expand_transparent_edge(filepath)
                 files.append(str(filepath.relative_to(output_root)))
 
             self._last_frame_size = (self.settings.resolution_x, self.settings.resolution_y)
@@ -135,7 +138,7 @@ class SpriteBaker:
         if pass_id == "ALBEDO":
             setup_albedo(objects)
         elif pass_id == "NORMAL":
-            setup_normal(objects)
+            setup_normal(objects, unity_2d=self.settings.unity_2d_normal_map)
         elif pass_id == "MASK":
             setup_mask(objects)
 

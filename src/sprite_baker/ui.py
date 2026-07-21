@@ -198,6 +198,10 @@ class SBK_PT_passes(bpy.types.Panel):
         layout = self.layout
         layout.prop(settings, "use_albedo")
         layout.prop(settings, "use_normal")
+        normal_options = layout.column(align=True)
+        normal_options.enabled = settings.use_normal
+        normal_options.prop(settings, "unity_2d_normal_map")
+        normal_options.prop(settings, "normal_map_edge_padding")
         layout.prop(settings, "use_mask")
         layout.prop(settings, "unity_names")
 

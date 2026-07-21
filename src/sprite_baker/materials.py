@@ -14,8 +14,8 @@ def setup_albedo(objects):
     return mapping
 
 
-def setup_normal(objects):
-    mat = make_normal_material()
+def setup_normal(objects, unity_2d=False):
+    mat = make_normal_material(unity_2d=unity_2d)
     for obj in objects:
         if hasattr(obj.data, "materials"):
             replace_materials(obj, [mat] * max(1, len(obj.data.materials)))
@@ -71,7 +71,7 @@ def make_albedo_material(source):
     return mat
 
 
-def make_normal_material():
+def make_normal_material(unity_2d=False):
     mat = bpy.data.materials.new("SBK_TMP_NormalMap")
     mat.use_nodes = True
     nodes = mat.node_tree.nodes
@@ -86,7 +86,10 @@ def make_normal_material():
     transform.convert_to = "CAMERA"
     multiply = nodes.new("ShaderNodeVectorMath")
     multiply.operation = "MULTIPLY"
-    multiply.inputs[1].default_value = (0.5, 0.5, 0.5)
+    # Blender cameras look along local -Z, whereas Unity's 2D Sprite normal
+    # maps use +Z for a surface facing the viewer. Keep the legacy output
+    # unless the Unity conversion is explicitly requested.
+    multiply.inputs[1].default_value = (0.5, 0.5, -0.5) if unity_2d else (0.5, 0.5, 0.5)
     add = nodes.new("ShaderNodeVectorMath")
     add.operation = "ADD"
     add.inputs[1].default_value = (0.5, 0.5, 0.5)

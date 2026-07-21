@@ -255,6 +255,16 @@ class SBK_Settings(bpy.types.PropertyGroup):
     )
     use_albedo: bpy.props.BoolProperty(name="Albedo", default=True)
     use_normal: bpy.props.BoolProperty(name="NormalMap", default=True)
+    unity_2d_normal_map: bpy.props.BoolProperty(
+        name="按 Unity 2D 法线坐标导出",
+        description="将相机前方转换为 Unity Sprite 法线贴图的 +Z 方向",
+        default=False,
+    )
+    normal_map_edge_padding: bpy.props.BoolProperty(
+        name="NormalMap 透明边缘向外扩 1 像素",
+        description="复制轮廓相邻法线的 RGB 到外侧透明像素，降低 Unity 双线性采样造成的边缘异常",
+        default=False,
+    )
     use_mask: bpy.props.BoolProperty(name="MaskTex", default=True)
     unity_names: bpy.props.BoolProperty(name="Unity 命名", default=True)
     export_items: bpy.props.CollectionProperty(type=SBK_ExportItem)

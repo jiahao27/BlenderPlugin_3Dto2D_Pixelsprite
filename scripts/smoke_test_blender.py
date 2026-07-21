@@ -124,6 +124,8 @@ def configure_camera_baker(cube, action, output_dir):
     settings.bake_mode = "CAMERA"
     settings.use_albedo = True
     settings.use_normal = True
+    settings.unity_2d_normal_map = True
+    settings.normal_map_edge_padding = True
     settings.use_mask = True
     settings.camera_source = "VISIBLE_BAKE_CAMERA"
     settings.frame_sampling = "FRAME_COUNT"
