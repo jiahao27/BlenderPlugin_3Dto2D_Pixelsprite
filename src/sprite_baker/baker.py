@@ -127,6 +127,7 @@ class SpriteBaker:
             pass_ids = enabled_passes(self.settings)
             for pass_id in pass_ids:
                 restore_material_slots(objects, original_materials)
+                self.configure_color_management_for_pass(pass_id)
                 self.setup_pass(objects, pass_id)
                 filepath = self.output_path(output_root, item, action_name, direction, output_frame or frame, pass_id, preview)
                 filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -194,6 +195,15 @@ class SpriteBaker:
             self.settings.pixel_preview_offset_x,
             self.settings.pixel_preview_offset_y,
         )
+
+    def configure_color_management_for_pass(self, pass_id):
+        # Normal maps are vector data, not display colors. Writing them through
+        # Standard/sRGB turns a neutral 0.5 component into about 0.735, which
+        # Unity then decodes as a strongly biased normal direction.
+        self.scene.view_settings.view_transform = "Raw" if pass_id == "NORMAL" else "Standard"
+        self.scene.view_settings.look = "None"
+        self.scene.view_settings.exposure = 0.0
+        self.scene.view_settings.gamma = 1.0
 
     def apply_action(self, item, action):
         target = self.animation_target_for_item(item)

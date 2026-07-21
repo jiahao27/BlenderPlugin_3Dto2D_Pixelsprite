@@ -9,6 +9,7 @@ def expand_transparent_edge(filepath, alpha_threshold=0.001):
     """
     image = bpy.data.images.load(str(filepath), check_existing=False)
     try:
+        image.colorspace_settings.name = "Non-Color"
         width, height = image.size
         if width < 2 or height < 2:
             return False

@@ -48,6 +48,7 @@ def main() -> None:
         camera_directions = {path.parent.parent.name for path in (output_dir / "Camera").rglob("*_NormalMap.png")}
         if camera_directions != {"dir_000", "dir_090", "dir_180", "dir_270"}:
             raise RuntimeError(f"Camera bake directions were not exported: {camera_directions}")
+        assert_unity_normal_map_encoding(next((output_dir / "Camera").rglob("*_NormalMap.png")))
         camera_albedo = sorted((output_dir / "Camera").rglob("*_Albedo.png"))
         camera_hashes = {hashlib.sha256(path.read_bytes()).hexdigest() for path in camera_albedo}
         if len(camera_albedo) > 1 and len(camera_hashes) == 1:
@@ -182,6 +183,22 @@ def configure_pixel_baker(cube, output_dir):
     settings.direction_preset = "SINGLE"
     bpy.ops.sprite_baker.generate_directions()
     reset_items(settings)
+
+
+def assert_unity_normal_map_encoding(path):
+    image = bpy.data.images.load(str(path), check_existing=False)
+    try:
+        image.colorspace_settings.name = "Non-Color"
+        width, height = image.size
+        index = ((height // 2) * width + (width // 2)) * 4
+        red, green, blue, alpha = image.pixels[index:index + 4]
+        if alpha <= 0.5 or not (0.45 <= red <= 0.55 and 0.45 <= green <= 0.55 and blue >= 0.95):
+            raise RuntimeError(
+                "NormalMap is not stored as Unity-compatible linear vector data: "
+                f"{(red, green, blue, alpha)}"
+            )
+    finally:
+        bpy.data.images.remove(image)
 
 
 if __name__ == "__main__":
