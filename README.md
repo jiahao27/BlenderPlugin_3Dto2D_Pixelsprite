@@ -1,34 +1,106 @@
 # Sprite Baker
 
-Sprite Baker 是一个面向 Blender 5.2 LTS 的多通道 Sprite 烘焙插件，用于把 3D 物体、角色动作或相机画面导出为 Unity 2D/URP 友好的 2D Sprite 资源。
+**Sprite Baker** 是一款基于 Blender 5.2 LTS 开发的三维模型二维图像自动生成与风格化处理插件。
 
-插件界面位于：
+插件使用 Python 和 Blender Python API（`bpy`）实现三维场景控制、相机管理、动画帧采集及图像导出，并提供像素化处理、多通道烘焙和 Sprite Sheet 合成等功能。
+
+通过将三维模型及其动画数据转换为二维图像序列，Sprite Baker 能够辅助完成多视角视觉素材生成、低分辨率图像制作及风格化资源生产，减少重复性的图像采集与处理工作。
+
+项目主要面向数字媒体艺术、二维动画素材制作、数字视觉设计以及三维数字资产的二维化应用等场景。
+
+## 核心功能
+
+### 1. 三维模型图像生成
+
+- **相机烘焙**：根据指定摄像机的视角生成图像，支持固定视角渲染及手动相机控制。
+- **批量动作烘焙**：按照目标物体、动画 Action 和观察方向，批量生成连续帧图像。
+- **多方向图像采集**：支持单方向、4 向、8 向及自定义方向配置。
+- **动画帧采集**：支持指定起止帧和帧采样间隔，实现动画序列自动生成。
+- **固定动作窗口**：扫描完整动画区间，根据最大边界确定相机窗口，避免不同动画帧之间出现画面构图跳动。
+
+### 2. 图像风格化处理
+
+提供面向低分辨率视觉素材的像素化处理功能。
+
+- 支持 `64 × 64`、`128 × 128`、`256 × 256` 等画布预设及自定义分辨率。
+- 提供相机像素栅格预览，辅助控制图像构图与像素尺寸。
+- 支持像素化烘焙效果的启用与配置。
+
+### 3. 多通道图像生成
+
+支持从三维场景中生成不同用途的图像通道：
+
+| 通道 | 说明 |
+|---|---|
+| `Albedo` | 物体基础颜色信息 |
+| `NormalMap` | 法线信息 |
+| `MaskTex` | 遮罩信息 |
+
+各通道独立导出，并支持分别合成为图集，便于后续图像处理及数字视觉素材制作。
+
+### 4. 图像序列与图集管理
+
+- 按目标物体、动画动作和观察方向组织输出资源。
+- 自动生成连续帧图像序列。
+- 支持将图像序列合并为 Sprite Sheet / Atlas。
+- 为不同图像通道分别生成图集，保证布局一致。
+- 自动生成 `metadata.json`，记录图集相关信息。
+
+## 应用场景
+
+Sprite Baker 不仅可以用于 Sprite 资源制作，也可以作为三维数字资产转化为二维视觉素材的辅助工具。
+
+- **数字媒体艺术与视觉设计**：将三维模型转换为低分辨率图像，为像素艺术、数字插画及风格化视觉创作提供素材。
+- **二维动画与动态视觉素材**：通过自动化动画帧采集和多视角渲染，生成连续图像序列，辅助动态视觉内容制作。
+- **数字化产品展示**：从不同视角生成产品图像，并进行统一风格处理，用于产品展示、数字目录及视觉资料制作。
+- **技术插图与数字文档**：将三维模型转换为多角度二维图像，用于技术说明、产品文档及数字化信息展示。
+
+## 技术方案
+
+| 技术 | 用途 |
+|---|---|
+| Python | 插件主要开发语言 |
+| Blender 5.2 LTS | 三维场景管理与图像渲染平台 |
+| Blender Python API (`bpy`) | 场景控制、摄像机管理及动画采集 |
+| NumPy / Pillow / OpenCV | 图像数据处理与风格化算法扩展 |
+
+系统主要工作流程：
 
 ```text
-视图 3D > 右侧侧栏 > 精灵烘焙
+三维模型 / 动画数据
+        |
+        v
+Blender 场景与摄像机控制
+        |
+        v
+多视角渲染 / 动画帧采集
+        |
+        v
+多通道图像生成
+        |
+        v
+像素化与风格化处理
+        |
+        v
+图像序列组织与 Sprite Sheet 合成
+        |
+        v
+PNG 图像 / Atlas / JSON 元数据
 ```
 
-## 主要功能
+## 安装方式
 
-- `相机烘焙`：摄像机看到什么就导出什么，适合固定视角、手动摆相机、像素风预览。
-- `批量动作烘焙`：按目标、Action、方向批量导出角色序列帧。
-- 多通道输出：`Albedo`、`NormalMap`、`MaskTex`。
-- 像素烘焙：支持 `64 x 64`、`128 x 128`、`256 x 256` 画布预设和相机栅格预览。
-- 固定动作窗口：批量动作烘焙时先扫描整段动作，使用最大边界固定相机窗口，避免动画大小跳动。
-- 合并为大图：导出后可按通道、动作、方向生成 Sprite Sheet，并写入 `metadata.json`。
+### 1. 获取插件
 
-## 项目结构
+克隆项目仓库：
 
-```text
-.
-├── src/
-│   └── sprite_baker/             # Blender 可安装插件包
-├── scripts/                      # 打包、检查、烟测脚本
-├── docs/                         # 开发说明
-└── dist/                         # 打包产物，生成 sprite_baker.zip
+```bash
+git clone git@github.com:jiahao27/BlenderPlugin_3Dto2D_Pixelsprite.git
 ```
 
-## 打包方法
+也可以从 GitHub 下载项目压缩包。
+
+### 2. 打包插件
 
 在仓库根目录运行：
 
@@ -39,43 +111,52 @@ python scripts/package_addon.py
 成功后会生成：
 
 ```text
-dist/sprite_baker.zip
+dist/
+└── sprite_baker.zip
 ```
 
-在 Blender 中安装：
+### 3. 在 Blender 中安装
+
+打开 Blender，进入：
 
 ```text
 Edit > Preferences > Add-ons > Install...
 ```
 
-选择 `dist/sprite_baker.zip`，安装后启用插件。
+选择生成的 `dist/sprite_baker.zip`，安装后启用插件。
 
 ## 基本使用
 
+插件界面位于：
+
+```text
+视图 3D > 右侧侧栏 > 精灵烘焙
+```
+
 ### 相机烘焙
 
-适合“摄像机固定，看到什么导出什么”的工作流。
+适合固定视角图像生成，以及手动控制摄像机的工作流程。
 
-1. 在 `烘焙模式` 选择 `相机烘焙`。
+1. 在 `烘焙模式` 中选择 `相机烘焙`。
 2. 点击 `创建/更新烘焙相机`，或手动指定 `烘焙相机`。
 3. 设置 `起始帧`、`结束帧` 和 `帧采样`。
-4. 如果需要烘焙动作，可在 `动画对象` 中选择骨架或物体，在 `动作` 中选择 Action。
+4. 如需采集动画，在 `动画对象` 中选择骨架或物体，并指定对应 Action。
 5. 选择需要输出的通道：`Albedo`、`NormalMap`、`MaskTex`。
 6. 点击 `预览当前帧` 或 `导出精灵序列`。
 
 ### 批量动作烘焙
 
-适合角色动作、多方向 Sprite。
+适合角色动画、多方向图像序列等批量生成场景。
 
-1. 在 `烘焙模式` 选择 `批量动作烘焙`。
+1. 在 `烘焙模式` 中选择 `批量动作烘焙`。
 2. 在 `烘焙目标` 中添加目标物体或集合。
-3. 如果是骨骼动画，指定 `骨架`。
-4. 选择 `动作模式` 为 `动作`，添加要导出的 Action。
-5. 选择方向：`单方向`、`4 向`、`8 向` 或 `自定义`。
-6. `构图方式` 推荐使用 `固定动作窗口`，它会扫描整段动作并固定最大相机窗口。
+3. 如果使用骨骼动画，指定对应的 `骨架`。
+4. 在 `动作模式` 中选择 `动作`，并添加需要导出的 Action。
+5. 选择图像采集方向：`单方向`、`4 向`、`8 向` 或 `自定义`。
+6. `构图方式` 推荐使用 `固定动作窗口`，自动扫描动画区间并确定统一的相机窗口。
 7. 点击 `导出精灵序列`。
 
-### 像素烘焙
+### 像素化处理
 
 在 `像素烘焙效果` 中开启：
 
@@ -83,7 +164,7 @@ Edit > Preferences > Add-ons > Install...
 启用像素烘焙
 ```
 
-可选画布：
+支持以下画布预设：
 
 ```text
 64 x 64
@@ -92,9 +173,11 @@ Edit > Preferences > Add-ons > Install...
 自定义
 ```
 
-`刷新栅格` 会在烘焙相机中显示像素格预览；`栅格透明度` 用来调节预览强度。栅格只用于预览，不会写入最终 PNG。
+点击 `刷新栅格`，可以在烘焙相机中显示像素网格预览；通过 `栅格透明度` 调整预览效果。
 
-### 合并为大图
+栅格仅用于辅助构图，不会写入最终导出的 PNG 图像。
+
+### Sprite Sheet 合成
 
 在 `项目设置` 中开启：
 
@@ -102,7 +185,7 @@ Edit > Preferences > Add-ons > Install...
 合并为大图
 ```
 
-插件会在序列帧导出后，为每个通道分别生成大图：
+插件会在图像序列导出后，按照通道分别生成图集：
 
 ```text
 Albedo_Atlas.png
@@ -110,20 +193,20 @@ NormalMap_Atlas.png
 MaskTex_Atlas.png
 ```
 
-合图规则：
+当前图集排列规则：
 
 ```text
 16 帧 -> 4 x 4
 12 帧 -> 4 x 3
 10 帧 -> 5 x 2
-17 帧 -> 质数，提示无法合图，只导出序列帧
+17 帧 -> 质数，提示无法合图，仅导出序列帧
 ```
 
-即使没有开启合图，导出前也会检查帧数。如果帧数是质数，会提示之后难以按当前规则合并为大图，但不会阻止导出。
+即使未开启图集合成，插件也会在导出前检查帧数，并在无法按照当前规则合成时给出提示，但不会阻止图像序列导出。
 
 ## 输出结构
 
-默认输出结构：
+默认输出目录：
 
 ```text
 output/
@@ -136,7 +219,7 @@ output/
             └── metadata.json
 ```
 
-文件命名遵循：
+图像文件命名规则：
 
 ```text
 *_Albedo.png
@@ -144,9 +227,22 @@ output/
 *_MaskTex.png
 ```
 
-合图信息会写入 `metadata.json` 的 `atlas_files` 字段。
+图集文件信息会写入 `metadata.json` 的 `atlas_files` 字段。
 
-## 常用检查命令
+## 项目结构
+
+```text
+.
+├── src/
+│   └── sprite_baker/             # Blender 可安装插件包
+├── scripts/                      # 打包、检查及测试脚本
+├── docs/                         # 开发文档
+└── dist/                         # 插件打包产物
+```
+
+## 开发与测试
+
+在仓库根目录运行以下命令：
 
 ```powershell
 # Python 语法检查
@@ -162,49 +258,18 @@ powershell -ExecutionPolicy Bypass -File scripts/run_blender_smoke_test.ps1
 powershell -ExecutionPolicy Bypass -File scripts/run_pixel_tools_smoke_test.ps1
 ```
 
-当前验证 Blender 路径：
+## 项目信息
 
-```text
-E:\stream\steamapps\common\Blender\blender.exe
-```
-
-## 推送到 GitHub
-
-当前远端仓库：
-
-```text
-git@github.com:jiahao27/BlenderPlugin_3Dto2D_Pixelsprite.git
-```
-
-如果本机 `git` 已在 PATH 中：
-
-```powershell
-git status
-git add .
-git commit -m "Update sprite baker"
-git push
-```
-
-如果 PowerShell 找不到 `git`，可以使用当前机器上的 Git 路径：
-
-```powershell
-& 'C:\Program Files\Git\cmd\git.exe' status
-& 'C:\Program Files\Git\cmd\git.exe' add .
-& 'C:\Program Files\Git\cmd\git.exe' commit -m "Update sprite baker"
-& 'C:\Program Files\Git\cmd\git.exe' push
-```
-
-如果是第一次连接远端：
-
-```powershell
-& 'C:\Program Files\Git\cmd\git.exe' remote add origin git@github.com:jiahao27/BlenderPlugin_3Dto2D_Pixelsprite.git
-& 'C:\Program Files\Git\cmd\git.exe' branch -M main
-& 'C:\Program Files\Git\cmd\git.exe' push -u origin main
-```
+- **项目名称**：Sprite Baker
+- **开发语言**：Python
+- **运行平台**：Blender 5.2 LTS
+- **项目类型**：Blender 插件 / 三维模型二维图像生成与处理工具
+- **输出格式**：PNG、Sprite Sheet、JSON
 
 ## 备注
 
-- 插件目标版本为 Blender 5.2 LTS。
-- Unity 适配重点是 2D/URP 的 Sprite Secondary Textures。
-- `NormalMap` 和 `MaskTex` 不建议和 `Albedo` 混在同一张图里；插件会分别合图，保证布局一致。
-- 图集打包目前是基础 Sprite Sheet 合并，不包含 Unity 自动导入脚本。
+- 插件当前目标版本为 Blender 5.2 LTS。
+- Unity 适配重点为 2D / URP 的 Sprite Secondary Textures。
+- `NormalMap` 和 `MaskTex` 不建议与 `Albedo` 混合在同一张图中；插件会分别生成图集，并保持相同的排列布局。
+- 当前图集打包采用基础 Sprite Sheet 合并方式，暂不包含 Unity 自动导入脚本。
+
