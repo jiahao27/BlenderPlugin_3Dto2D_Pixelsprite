@@ -16,6 +16,10 @@ def supersample_factor(settings):
     return settings.pixel_sample_factor if is_supersampled(settings) else 1
 
 
+def packs_normal_mask(settings):
+    return settings.use_normal and settings.pack_mask_in_normal and not is_supersampled(settings)
+
+
 def enabled_passes(settings):
     passes = []
     if settings.use_albedo:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import hashlib
 import json
+import math
 import shutil
 import sys
 import tempfile
@@ -81,7 +82,9 @@ def main() -> None:
             raise RuntimeError("Sprite atlas files were not generated for all enabled passes.")
 
         high_count = verify_supersampling(output_dir / "supersampled")
-        print(f"Sprite Baker smoke test passed: {count + batch_count + pixel_count + high_count} files in {output_dir}")
+        packed_count = verify_packed_normals(output_dir / "packed")
+        total = count + batch_count + pixel_count + high_count + packed_count
+        print(f"Sprite Baker smoke test passed: {total} files in {output_dir}")
     finally:
         addon.unregister()
 
@@ -218,6 +221,7 @@ def verify_supersampling(output_dir):
     settings.pixel_downsample_method = "TOP_LEFT"
     settings.color_quantization = "FIXED"
     settings.fixed_palette = "#1357AB, #F3AC62"
+    settings.pack_mask_in_normal = True
 
     settings.use_albedo = False
     settings.use_normal = False
@@ -234,7 +238,7 @@ def verify_supersampling(output_dir):
     if original != (render.resolution_x, render.resolution_y, render.use_compositing, render.dither_intensity):
         raise RuntimeError("Blender render settings were not restored.")
     data = json.loads(next(output_dir.rglob("metadata.json")).read_text(encoding="utf-8"))
-    if data["frame_size"] != [24, 20] or len(data["atlas_files"]) != 2:
+    if data["frame_size"] != [24, 20] or len(data["atlas_files"]) != 2 or "normal_map_encoding" in data:
         raise RuntimeError("The metadata must record the final dimensions and both supported atlases.")
     if any(entry["atlas_size"] != [48, 40] for entry in data["atlas_files"]):
         raise RuntimeError("The atlases did not use the downsampled tile sizes.")
@@ -254,6 +258,7 @@ def verify_supersampling(output_dir):
         raise RuntimeError("The Albedo atlas did not preserve the fixed palette.")
 
     settings.pixel_sampling = "DIRECT"
+    settings.pack_mask_in_normal = False
     settings.color_quantization = "KMEANS"
     settings.kmeans_colors = 1
     files = SpriteBaker(bpy.context).render_preview()
@@ -264,6 +269,83 @@ def verify_supersampling(output_dir):
     colors = np.unique(pixels[pixels[..., 3] > 0, :3], axis=0)
     if pixels.shape != (20, 24, 4) or len(colors) != 1:
         raise RuntimeError("Direct sampling K-means preview did not output a one-color Albedo.")
+    return count
+
+
+def verify_packed_normals(output_dir):
+    from sprite_baker.baker import SpriteBaker
+
+    clear_scene()
+    mesh = bpy.data.meshes.new("SmokePackedMesh")
+    mesh.from_pydata(
+        [(-1, 0, -0.5), (0, 0, -0.5), (0, 0, 0.5), (-1, 0, 0.5), (1, 0, -0.5), (1, 0, 0.5)],
+        [],
+        [(0, 1, 2, 3), (1, 4, 5, 2)],
+    )
+    obj = bpy.data.objects.new("SmokePacked", mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    left, right = [bpy.data.materials.new(name) for name in ("PackedLeft", "PackedRight")]
+    mesh.materials.append(None)
+    mesh.materials.append(right)
+    obj.material_slots[0].link = "OBJECT"
+    obj.material_slots[0].material = left
+    mesh.polygons[1].material_index = 1
+    left.sprite_baker_mask.enabled = True
+    left.sprite_baker_mask.r = 0.25
+    obj.sprite_baker_mask.enabled = True
+    obj.sprite_baker_mask.r = 0.75
+
+    scene = bpy.context.scene
+    settings = scene.sprite_baker_settings
+    settings.output_dir = str(output_dir)
+    settings.camera_action = None
+    settings.camera_animation_target = None
+    settings.frame_end = settings.frame_start
+    settings.resolution_x = 48
+    settings.resolution_y = 28
+    settings.use_albedo = True
+    settings.color_quantization = "NONE"
+    settings.use_mask = False
+    settings.normal_map_edge_padding = True
+    scene.render.dither_intensity = 0
+    camera_data = bpy.data.cameras.new("SmokePackedCamera")
+    camera_data.type = "ORTHO"
+    camera_data.ortho_scale = 2.25
+    camera = bpy.data.objects.new("SmokePackedCamera", camera_data)
+    scene.collection.objects.link(camera)
+    camera.location = (0, -10, 0)
+    camera.rotation_euler = (math.pi / 2, 0, 0)
+    scene.camera = settings.bake_camera = camera
+    bpy.context.view_layer.update()
+
+    preview = SpriteBaker(bpy.context).render_preview()
+    regular_name = next(path for path in preview if path.endswith("_NormalMap.png"))
+    regular_path = output_dir / "_preview" / regular_name
+    assert_unity_normal_map_encoding(regular_path)
+    regular = read_rgba_bytes(regular_path)
+
+    settings.pack_mask_in_normal = True
+    count = SpriteBaker(bpy.context).export_all()
+    data = json.loads(next(output_dir.rglob("metadata.json")).read_text(encoding="utf-8"))
+    if data.get("normal_map_encoding") != "XY_MASK_R" or list(output_dir.rglob("*MaskTex*.png")):
+        raise RuntimeError("Packed encoding must be documented even without a separate MaskTex.")
+
+    normal = next(path for path in output_dir.rglob("*_NormalMap.png") if "_preview" not in path.parts)
+    atlas = next(output_dir.rglob("*_NormalMap_Atlas.png"))
+    packed = read_rgba_bytes(normal)
+    np.testing.assert_array_equal(packed[..., 3], regular[..., 3])
+    np.testing.assert_allclose(packed[..., :2].astype(int), regular[..., :2].astype(int), atol=1, rtol=0)
+    height, width = packed.shape[:2]
+    if tuple(packed[height // 2, [width // 4, width * 3 // 4], 2]) != (64, 191):
+        raise RuntimeError("Packed mask values were assigned to the wrong faces.")
+    for image in (packed, read_rgba_bytes(atlas)):
+        blue = set(image[..., 2][image[..., 3] == 255].tolist())
+        if blue != {64, 191}:
+            raise RuntimeError(f"Packed B did not preserve material/object mask weights: {blue}")
+    if [face.material_index for face in mesh.polygons] != [0, 1]:
+        raise RuntimeError("Baking changed the mesh face material indices.")
+    if obj.material_slots[0].link != "OBJECT" or obj.material_slots[0].material != left or mesh.materials[1] != right:
+        raise RuntimeError("Baking did not restore object and mesh materials.")
     return count
 
 

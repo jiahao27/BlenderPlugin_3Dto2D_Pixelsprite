@@ -315,6 +315,11 @@ class SBK_Settings(bpy.types.PropertyGroup):
         description="复制轮廓相邻法线的 RGB 到外侧透明像素，降低 Unity 双线性采样造成的边缘异常",
         default=False,
     )
+    pack_mask_in_normal: bpy.props.BoolProperty(
+        name="法线通道打包（XY + 遮罩 R）",
+        description="保留法线 XY 和透明度，用 B 存储 MaskTex R；需要着色器重建正 Z 并单独读取遮罩",
+        default=False,
+    )
     use_mask: bpy.props.BoolProperty(name="MaskTex", default=True)
     unity_names: bpy.props.BoolProperty(name="Unity 命名", default=True)
     export_items: bpy.props.CollectionProperty(type=SBK_ExportItem)

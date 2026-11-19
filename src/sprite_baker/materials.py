@@ -1,45 +1,54 @@
+from contextlib import contextmanager
+
 import bpy
 
 
-def setup_albedo(objects):
-    mapping = {}
-    for obj in objects:
-        if not hasattr(obj.data, "materials"):
-            continue
-        new_mats = []
-        for mat in obj.data.materials:
-            new_mats.append(make_albedo_material(mat))
-        replace_materials(obj, new_mats)
-        mapping[obj] = new_mats
-    return mapping
+def albedo_materials(objects):
+    return temporary_materials(objects, lambda _obj, mat: make_albedo_material(mat))
 
 
-def setup_normal(objects, unity_2d=False):
-    mat = make_normal_material(unity_2d=unity_2d)
-    for obj in objects:
-        if hasattr(obj.data, "materials"):
-            replace_materials(obj, [mat] * max(1, len(obj.data.materials)))
-    return mat
+def normal_materials(objects, unity_2d=False, pack_mask=False):
+    materials = {}
+
+    def normal_for_slot(obj, mat):
+        mask_red = mask_values(obj, mat)[0] if pack_mask else None
+        if mask_red not in materials:
+            materials[mask_red] = make_normal_material(unity_2d, mask_red)
+        return materials[mask_red]
+
+    return temporary_materials(objects, normal_for_slot)
 
 
-def setup_mask(objects):
-    for obj in objects:
-        if not hasattr(obj.data, "materials"):
-            continue
-        new_mats = []
-        source_mats = list(obj.data.materials) or [None]
-        for mat in source_mats:
-            values = mask_values(obj, mat)
-            new_mats.append(make_mask_material(values))
-        replace_materials(obj, new_mats)
+def mask_materials(objects):
+    return temporary_materials(objects, lambda obj, mat: make_mask_material(mask_values(obj, mat)))
 
 
-def replace_materials(obj, materials):
-    obj.data.materials.clear()
-    if not materials:
-        materials = [make_albedo_material(None)]
-    for mat in materials:
-        obj.data.materials.append(mat)
+@contextmanager
+def temporary_materials(objects, material_for_slot):
+    # Never clear populated mesh slots: Blender would reset face material indices.
+    # Object-linked overrides also keep separate assignments on shared meshes.
+    overrides = []
+    added_slots = []
+    try:
+        for obj in objects:
+            if not hasattr(obj.data, "materials"):
+                continue
+            if not obj.material_slots:
+                obj.data.materials.append(None)
+                added_slots.append(obj.data.materials)
+            for slot in obj.material_slots:
+                replacement = material_for_slot(obj, slot.material)
+                original_link = slot.link
+                slot.link = "OBJECT"
+                overrides.append((slot, original_link, slot.material))
+                slot.material = replacement
+        yield
+    finally:
+        for slot, original_link, original_material in reversed(overrides):
+            slot.material = original_material
+            slot.link = original_link
+        for materials in added_slots:
+            materials.pop(index=0)
 
 
 def make_albedo_material(source):
@@ -71,7 +80,7 @@ def make_albedo_material(source):
     return mat
 
 
-def make_normal_material(unity_2d=False):
+def make_normal_material(unity_2d=False, mask_red=None):
     mat = bpy.data.materials.new("SBK_TMP_NormalMap")
     mat.use_nodes = True
     nodes = mat.node_tree.nodes
@@ -89,10 +98,11 @@ def make_normal_material(unity_2d=False):
     # Blender cameras look along local -Z, whereas Unity's 2D Sprite normal
     # maps use +Z for a surface facing the viewer. Keep the legacy output
     # unless the Unity conversion is explicitly requested.
-    multiply.inputs[1].default_value = (0.5, 0.5, -0.5) if unity_2d else (0.5, 0.5, 0.5)
+    z_scale = -0.5 if unity_2d else 0.5
+    multiply.inputs[1].default_value = (0.5, 0.5, 0.0 if mask_red is not None else z_scale)
     add = nodes.new("ShaderNodeVectorMath")
     add.operation = "ADD"
-    add.inputs[1].default_value = (0.5, 0.5, 0.5)
+    add.inputs[1].default_value = (0.5, 0.5, mask_red if mask_red is not None else 0.5)
     emission = nodes.new("ShaderNodeEmission")
     emission.inputs["Strength"].default_value = 1.0
 

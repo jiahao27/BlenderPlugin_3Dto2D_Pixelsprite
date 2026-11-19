@@ -191,6 +191,28 @@ Edit > Preferences > Add-ons > Install...
 
 颜色量化在空间降采样之后执行，仅改变可见 Albedo 像素的 RGB，保留 Alpha。
 
+### 法线和遮罩通道打包
+
+在「通道输出」启用 `NormalMap`，再勾选「法线通道打包（XY + 遮罩 R）」。该选项默认关闭，当前只支持直接渲染；高采样会输出普通法线图。
+
+| 输出通道 | 数据 |
+|---|---|
+| R、G | 编码到 0–1 的法线 X、Y |
+| B | “遮罩分配”中的 R 权重；优先采用材质设置，其次是物体设置 |
+| A | 法线图原有的透明度 |
+
+无需勾选单独的 `MaskTex` 就能打包 R；若需要遮罩中的其他通道，请继续导出独立的 `MaskTex`。打包布局会应用到 NormalMap 帧和图集，`metadata.json` 中会记录 `normal_map_encoding: "XY_MASK_R"`。
+
+在 Unity 中，用 `Default` 类型导入打包图，关闭 sRGB，建议先关闭压缩，避免导入器重新打包颜色通道。由自定义 Shader 读取；`Sprite-Lit-Default` 不会把法线图 B 当作遮罩。样本 `packed` 的解码示例：
+
+```hlsl
+float2 xy = packed.rg * 2.0 - 1.0;
+float3 normal = normalize(float3(xy, sqrt(saturate(1.0 - dot(xy, xy)))));
+float maskR = packed.b;
+```
+
+法线重建采用正 Z 半球，原始 Z 的符号不会保留。这是通道打包，可在只需要 R 遮罩时少用一张贴图；PNG 本身仍是 RGBA。
+
 ### Sprite Sheet 合成
 
 在 `项目设置` 中开启：

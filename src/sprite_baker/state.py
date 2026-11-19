@@ -27,11 +27,6 @@ class SceneState:
         self.active = bpy.context.view_layer.objects.active
         self.object_matrices = {obj: obj.matrix_world.copy() for obj in self.objects}
         self.hide_render = {obj: obj.hide_render for obj in bpy.data.objects}
-        self.material_slots = {
-            obj: [mat for mat in obj.data.materials]
-            for obj in self.objects
-            if hasattr(obj.data, "materials")
-        }
         self.actions = {}
         for obj in self.objects:
             if obj.animation_data:
@@ -63,10 +58,6 @@ class SceneState:
         for obj, value in self.hide_render.items():
             if obj.name in bpy.data.objects:
                 obj.hide_render = value
-        for obj, materials in self.material_slots.items():
-            obj.data.materials.clear()
-            for mat in materials:
-                obj.data.materials.append(mat)
         for obj, action in self.actions.items():
             if obj.animation_data:
                 obj.animation_data.action = action

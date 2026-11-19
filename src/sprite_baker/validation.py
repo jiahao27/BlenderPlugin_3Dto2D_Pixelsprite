@@ -92,9 +92,12 @@ def processing_errors(settings):
 
 
 def processing_warnings(settings):
+    warnings = []
     if is_supersampled(settings) and settings.use_mask:
-        return ["高采样模式将跳过 MaskTex；切回低采样可恢复遮罩导出。"]
-    return []
+        warnings.append("高采样模式将跳过 MaskTex；切回低采样可恢复遮罩导出。")
+    if is_supersampled(settings) and settings.use_normal and settings.pack_mask_in_normal:
+        warnings.append("高采样暂不支持法线遮罩打包，本次输出普通 NormalMap。")
+    return warnings
 
 
 def atlas_warnings(context):

@@ -7,10 +7,10 @@ from mathutils import Vector
 
 from .atlas import build_sprite_atlas
 from .bake_image import process_render
-from .bake_options import enabled_passes, is_supersampled, output_size, supersample_factor
+from .bake_options import enabled_passes, is_supersampled, output_size, packs_normal_mask, supersample_factor
 from .camera import configure_camera, make_camera, make_visible_bake_camera, object_bounds, pivot_for_item, rotate_objects
 from .image_processing import parse_palette
-from .materials import setup_albedo, setup_mask, setup_normal
+from .materials import albedo_materials, mask_materials, normal_materials
 from .naming import PASS_LABELS, blend_abspath, frame_name, slugify
 from .normal_map import expand_transparent_edge
 from .pixel_tools.viewport_preview import remove_viewport_pixel_preview, setup_viewport_pixel_preview
@@ -146,15 +146,12 @@ class SpriteBaker:
                     camera = make_camera(self.scene, self.settings)
                 _, scale = configure_camera(self.scene, camera, self.settings, camera_bounds, direction.angle)
 
-            original_materials = capture_materials(objects)
-            pass_ids = enabled_passes(self.settings)
-            for pass_id in pass_ids:
-                restore_material_slots(objects, original_materials)
+            for pass_id in enabled_passes(self.settings):
                 self.configure_color_management_for_pass(pass_id)
-                self.setup_pass(objects, pass_id)
                 filepath = self.output_path(output_root, item, action_name, direction, output_frame or frame, pass_id, preview)
                 filepath.parent.mkdir(parents=True, exist_ok=True)
-                self.render_pass(filepath, pass_id)
+                with self.pass_materials(objects, pass_id):
+                    self.render_pass(filepath, pass_id)
                 if pass_id == "NORMAL" and self.settings.normal_map_edge_padding:
                     expand_transparent_edge(filepath)
                 files.append(str(filepath.relative_to(output_root)))
@@ -169,13 +166,14 @@ class SpriteBaker:
                 remove_viewport_pixel_preview(self.scene)
             remove_temp_data()
 
-    def setup_pass(self, objects, pass_id):
+    def pass_materials(self, objects, pass_id):
         if pass_id == "ALBEDO":
-            setup_albedo(objects)
-        elif pass_id == "NORMAL":
-            setup_normal(objects, unity_2d=self.settings.unity_2d_normal_map)
-        elif pass_id == "MASK":
-            setup_mask(objects)
+            return albedo_materials(objects)
+        if pass_id == "NORMAL":
+            return normal_materials(
+                objects, unity_2d=self.settings.unity_2d_normal_map, pack_mask=packs_normal_mask(self.settings),
+            )
+        return mask_materials(objects)
 
     def configure_scene_for_render(self, objects):
         try:
@@ -222,14 +220,17 @@ class SpriteBaker:
     def render_pass(self, filepath, pass_id):
         render = self.scene.render
         palette_options = self.palette_options if pass_id == "ALBEDO" else None
-        if self.sample_factor == 1 and palette_options is None:
-            render.filepath = str(filepath)
-            bpy.ops.render.render(write_still=True)
-            return
-
+        needs_processing = self.sample_factor > 1 or palette_options is not None
+        packed_normal = pass_id == "NORMAL" and packs_normal_mask(self.settings)
         previous_dither = render.dither_intensity
-        render.dither_intensity = 0.0
+        if needs_processing or packed_normal:
+            render.dither_intensity = 0.0
         try:
+            if not needs_processing:
+                render.filepath = str(filepath)
+                bpy.ops.render.render(write_still=True)
+                return
+
             with TemporaryDirectory(prefix="sbk_", dir=filepath.parent) as temp_dir:
                 source = Path(temp_dir) / "source.png"
                 destination = Path(temp_dir) / "processed.png"
@@ -402,6 +403,8 @@ class SpriteBaker:
             "directions": frames,
             "atlas_files": atlas_files or [],
         }
+        if packs_normal_mask(self.settings):
+            data["normal_map_encoding"] = "XY_MASK_R"
         with (action_root / "metadata.json").open("w", encoding="utf-8") as handle:
             json.dump(data, handle, indent=2, ensure_ascii=False)
 
@@ -420,26 +423,6 @@ def ensure_directions(item):
     from .operators import generate_directions_for_item
 
     generate_directions_for_item(item)
-
-
-def capture_materials(objects):
-    materials = {}
-    for obj in objects:
-        if hasattr(obj.data, "materials"):
-            materials[obj] = [mat for mat in obj.data.materials]
-    return materials
-
-
-def restore_material_slots(objects, original_materials):
-    for mat in list(bpy.data.materials):
-        if mat.name.startswith("SBK_TMP_"):
-            bpy.data.materials.remove(mat, do_unlink=True)
-    for obj in objects:
-        if obj not in original_materials:
-            continue
-        obj.data.materials.clear()
-        for mat in original_materials[obj]:
-            obj.data.materials.append(mat)
 
 
 class CameraExportItem:

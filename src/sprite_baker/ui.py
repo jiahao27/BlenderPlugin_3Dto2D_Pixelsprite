@@ -1,6 +1,6 @@
 import bpy
 
-from .bake_options import is_supersampled, output_size
+from .bake_options import is_supersampled, output_size, packs_normal_mask
 from .validation import get_active_item
 
 
@@ -242,6 +242,11 @@ class SBK_PT_passes(bpy.types.Panel):
         normal_options.enabled = settings.use_normal
         normal_options.prop(settings, "unity_2d_normal_map")
         normal_options.prop(settings, "normal_map_edge_padding")
+        packing = normal_options.row()
+        packing.enabled = not is_supersampled(settings)
+        packing.prop(settings, "pack_mask_in_normal")
+        if packs_normal_mask(settings):
+            normal_options.label(text="B 存储遮罩 R，需自定义着色器读取", icon="INFO")
         if is_supersampled(settings):
             mask = layout.row()
             mask.enabled = False
