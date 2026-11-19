@@ -1,5 +1,6 @@
 import bpy
 
+from .bake_options import is_supersampled, output_size
 from .validation import get_active_item
 
 
@@ -178,23 +179,36 @@ class SBK_PT_pixel_effect(bpy.types.Panel):
         col = layout.column(align=True)
         col.enabled = settings.enable_pixel_bake
         col.prop(settings, "pixel_canvas_preset")
+        col.prop(settings, "pixel_sampling")
         if settings.pixel_canvas_preset == "CUSTOM":
             row = col.row(align=True)
             row.prop(settings, "resolution_x")
             row.prop(settings, "resolution_y")
+        else:
+            width, height = output_size(settings)
+            col.label(text=f"当前画布：{width} x {height}")
+        if is_supersampled(settings):
+            col.prop(settings, "pixel_sample_factor")
+            width, height = output_size(settings)
+            factor = settings.pixel_sample_factor
+            col.label(text=f"渲染尺寸：{width * factor} × {height * factor}")
+            method_row = col.row()
+            method_row.enabled = settings.use_albedo
+            method_row.prop(settings, "pixel_downsample_method")
+            col.label(text="法线按向量平均并归一化")
+            col.label(text="用“预览当前帧”查看降采样结果", icon="INFO")
+        elif settings.pixel_canvas_preset == "CUSTOM":
             col.prop(settings, "pixel_preview_scale")
             row = col.row(align=True)
             row.prop(settings, "pixel_preview_offset_x", text="X")
             row.prop(settings, "pixel_preview_offset_y", text="Y")
-        else:
-            col.label(text=f"当前画布：{settings.resolution_x} x {settings.resolution_y}")
         col.prop(settings, "pixel_grid_opacity")
         grid_row = layout.row(align=True)
         grid_row.enabled = settings.enable_pixel_bake
         grid_row.operator("sprite_baker.refresh_pixel_grid", text="刷新栅格")
         grid_row.operator("sprite_baker.clear_pixel_grid", text="清理栅格")
         row = layout.row(align=True)
-        row.enabled = settings.enable_pixel_bake
+        row.enabled = settings.enable_pixel_bake and not is_supersampled(settings)
         row.operator("sprite_baker.setup_viewport_pixel_preview", text="设置像素预览")
         row.operator("sprite_baker.update_viewport_preview_resolution", text="更新")
         remove_row = layout.row()
@@ -214,12 +228,26 @@ class SBK_PT_passes(bpy.types.Panel):
         settings = context.scene.sprite_baker_settings
         layout = self.layout
         layout.prop(settings, "use_albedo")
+        color_options = layout.column(align=True)
+        color_options.enabled = settings.use_albedo
+        color_options.prop(settings, "color_quantization")
+        if settings.color_quantization == "FIXED":
+            color_options.prop(settings, "fixed_palette")
+        elif settings.color_quantization == "KMEANS":
+            color_options.prop(settings, "kmeans_colors")
+            color_options.prop(settings, "kmeans_iterations")
+            color_options.prop(settings, "kmeans_seed")
         layout.prop(settings, "use_normal")
         normal_options = layout.column(align=True)
         normal_options.enabled = settings.use_normal
         normal_options.prop(settings, "unity_2d_normal_map")
         normal_options.prop(settings, "normal_map_edge_padding")
-        layout.prop(settings, "use_mask")
+        if is_supersampled(settings):
+            mask = layout.row()
+            mask.enabled = False
+            mask.label(text="MaskTex（高采样下不可用）", icon="INFO")
+        else:
+            layout.prop(settings, "use_mask")
         layout.prop(settings, "unity_names")
 
 

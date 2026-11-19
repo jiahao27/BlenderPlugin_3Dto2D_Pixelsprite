@@ -5,7 +5,14 @@ import bpy
 from .baker import SpriteBaker
 from .camera import configure_camera, make_visible_bake_camera, object_bounds
 from .pixel_tools.grid_images import attach_grid_background, clear_grid_backgrounds
-from .validation import atlas_warnings, get_active_item, parse_custom_directions, target_objects, validate_settings
+from .validation import (
+    atlas_warnings,
+    get_active_item,
+    parse_custom_directions,
+    processing_warnings,
+    target_objects,
+    validate_settings,
+)
 
 
 class SBK_OT_add_export_item(bpy.types.Operator):
@@ -164,7 +171,7 @@ class SBK_OT_validate(bpy.types.Operator):
             for error in errors:
                 self.report({"ERROR"}, error)
             return {"CANCELLED"}
-        for warning in atlas_warnings(context):
+        for warning in processing_warnings(context.scene.sprite_baker_settings) + atlas_warnings(context):
             self.report({"WARNING"}, warning)
         self.report({"INFO"}, "烘焙配置检查通过。")
         return {"FINISHED"}
@@ -181,6 +188,8 @@ class SBK_OT_preview(bpy.types.Operator):
             for error in errors:
                 self.report({"ERROR"}, error)
             return {"CANCELLED"}
+        for warning in processing_warnings(context.scene.sprite_baker_settings):
+            self.report({"WARNING"}, warning)
         try:
             files = SpriteBaker(context).render_preview()
         except Exception as exc:
@@ -202,7 +211,7 @@ class SBK_OT_export(bpy.types.Operator):
             for error in errors:
                 self.report({"ERROR"}, error)
             return {"CANCELLED"}
-        for warning in atlas_warnings(context):
+        for warning in processing_warnings(context.scene.sprite_baker_settings) + atlas_warnings(context):
             self.report({"WARNING"}, warning)
         try:
             count = SpriteBaker(context).export_all()

@@ -9,6 +9,7 @@ import tempfile
 from pathlib import Path
 
 import bpy
+import numpy as np
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -79,7 +80,8 @@ def main() -> None:
         if len(atlases) < 3:
             raise RuntimeError("Sprite atlas files were not generated for all enabled passes.")
 
-        print(f"Sprite Baker smoke test passed: {count + batch_count + pixel_count} files in {output_dir}")
+        high_count = verify_supersampling(output_dir / "supersampled")
+        print(f"Sprite Baker smoke test passed: {count + batch_count + pixel_count + high_count} files in {output_dir}")
     finally:
         addon.unregister()
 
@@ -197,6 +199,82 @@ def assert_unity_normal_map_encoding(path):
                 "NormalMap is not stored as Unity-compatible linear vector data: "
                 f"{(red, green, blue, alpha)}"
             )
+    finally:
+        bpy.data.images.remove(image)
+
+
+def verify_supersampling(output_dir):
+    from sprite_baker.baker import SpriteBaker
+    from sprite_baker.validation import processing_errors
+
+    scene = bpy.context.scene
+    settings = scene.sprite_baker_settings
+    settings.output_dir = str(output_dir)
+    settings.pixel_canvas_preset = "CUSTOM"
+    settings.resolution_x = 24
+    settings.resolution_y = 20
+    settings.pixel_sampling = "SUPERSAMPLE"
+    settings.pixel_sample_factor = 3
+    settings.pixel_downsample_method = "TOP_LEFT"
+    settings.color_quantization = "FIXED"
+    settings.fixed_palette = "#1357AB, #F3AC62"
+
+    settings.use_albedo = False
+    settings.use_normal = False
+    if not processing_errors(settings):
+        raise RuntimeError("High sampling must reject MaskTex-only export.")
+    settings.use_albedo = True
+    settings.use_normal = True
+
+    render = scene.render
+    original = (render.resolution_x, render.resolution_y, render.use_compositing, render.dither_intensity)
+    count = SpriteBaker(bpy.context).export_all()
+    if count != 8 or list(output_dir.rglob("*MaskTex*.png")):
+        raise RuntimeError("High sampling must export both supported channels and skip MaskTex.")
+    if original != (render.resolution_x, render.resolution_y, render.use_compositing, render.dither_intensity):
+        raise RuntimeError("Blender render settings were not restored.")
+    data = json.loads(next(output_dir.rglob("metadata.json")).read_text(encoding="utf-8"))
+    if data["frame_size"] != [24, 20] or len(data["atlas_files"]) != 2:
+        raise RuntimeError("The metadata must record the final dimensions and both supported atlases.")
+    if any(entry["atlas_size"] != [48, 40] for entry in data["atlas_files"]):
+        raise RuntimeError("The atlases did not use the downsampled tile sizes.")
+    albedo = next(output_dir.rglob("*_Albedo.png"))
+    normal = next(output_dir.rglob("*_NormalMap.png"))
+    assert_unity_normal_map_encoding(normal)
+    pixels = read_rgba_bytes(albedo)
+    normal_pixels = read_rgba_bytes(normal)
+    if pixels.shape != (20, 24, 4) or normal_pixels.shape != pixels.shape:
+        raise RuntimeError("Albedo and NormalMap did not export at the requested dimensions.")
+    visible = pixels[..., 3] > 0
+    colors = {tuple(rgb) for rgb in pixels[visible, :3]}
+    if not colors or not colors <= {(19, 87, 171), (243, 172, 98)} or np.all(visible):
+        raise RuntimeError(f"Unexpected fixed palette colors or coverage: {colors}")
+    atlas = read_rgba_bytes(next(output_dir.rglob("*_Albedo_Atlas.png")))
+    if atlas.shape != (40, 48, 4) or not {tuple(rgb) for rgb in atlas[atlas[..., 3] > 0, :3]} <= colors:
+        raise RuntimeError("The Albedo atlas did not preserve the fixed palette.")
+
+    settings.pixel_sampling = "DIRECT"
+    settings.color_quantization = "KMEANS"
+    settings.kmeans_colors = 1
+    files = SpriteBaker(bpy.context).render_preview()
+    if not any(path.endswith("_MaskTex.png") for path in files):
+        raise RuntimeError("Switching back to direct sampling must restore MaskTex.")
+    albedo_preview = next(path for path in files if path.endswith("_Albedo.png"))
+    pixels = read_rgba_bytes(output_dir / "_preview" / albedo_preview)
+    colors = np.unique(pixels[pixels[..., 3] > 0, :3], axis=0)
+    if pixels.shape != (20, 24, 4) or len(colors) != 1:
+        raise RuntimeError("Direct sampling K-means preview did not output a one-color Albedo.")
+    return count
+
+
+def read_rgba_bytes(path):
+    image = bpy.data.images.load(str(path), check_existing=False)
+    try:
+        image.colorspace_settings.name = "Non-Color"
+        width, height = image.size
+        rgba = np.empty((height, width, 4), dtype=np.float32)
+        image.pixels.foreach_get(rgba.ravel())
+        return np.rint(rgba * 255).astype(np.uint8)
     finally:
         bpy.data.images.remove(image)
 

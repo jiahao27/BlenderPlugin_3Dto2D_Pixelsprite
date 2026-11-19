@@ -11,4 +11,5 @@ if (-not (Test-Path -LiteralPath $BlenderPath)) {
     throw "Blender executable not found: $BlenderPath"
 }
 
-& $BlenderPath --background --factory-startup --python $SmokeScript
+& $BlenderPath --background --factory-startup --python-exit-code 1 --python $SmokeScript
+exit $LASTEXITCODE

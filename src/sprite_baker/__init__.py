@@ -8,7 +8,16 @@ bl_info = {
     "category": "导入-导出",
 }
 
-from .registration import register, unregister
+def register():
+    from .registration import register as register_classes
+
+    register_classes()
+
+
+def unregister():
+    from .registration import unregister as unregister_classes
+
+    unregister_classes()
 
 
 __all__ = ("register", "unregister")

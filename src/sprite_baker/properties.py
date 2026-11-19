@@ -235,6 +235,27 @@ class SBK_Settings(bpy.types.PropertyGroup):
         default="LOCK_ACTION",
     )
     enable_pixel_bake: bpy.props.BoolProperty(name="启用像素烘焙", default=False, update=update_enable_pixel_bake)
+    pixel_sampling: bpy.props.EnumProperty(
+        name="空间采样",
+        items=(
+            ("DIRECT", "低采样 · 直接渲染", "以目标画布尺寸直接渲染"),
+            ("SUPERSAMPLE", "高采样 · 渲染后降采样", "放大渲染尺寸，再按块降采样至目标画布"),
+        ),
+        default="DIRECT",
+    )
+    pixel_sample_factor: bpy.props.IntProperty(
+        name="高采样倍数", description="渲染宽高分别乘以该整数倍", default=2, min=2, max=8,
+    )
+    pixel_downsample_method: bpy.props.EnumProperty(
+        name="Albedo 降采样",
+        items=(
+            ("CENTER", "中心最近邻", "取最接近块中心的可见像素颜色"),
+            ("TOP_LEFT", "左上角", "取最接近块左上角的可见像素颜色"),
+            ("AVERAGE", "面积平均", "按 Alpha 加权，对线性颜色求平均"),
+            ("MODE", "颜色众数", "取块内出现次数最多的可见 RGB 颜色"),
+        ),
+        default="AVERAGE",
+    )
     pixel_preview_scale: bpy.props.FloatProperty(
         name="像素颗粒度",
         description="先缩小再放大的比例；越小颗粒越粗，越接近 1 越接近原图",
@@ -267,6 +288,22 @@ class SBK_Settings(bpy.types.PropertyGroup):
         update=update_pixel_grid_opacity,
     )
     use_albedo: bpy.props.BoolProperty(name="Albedo", default=True)
+    color_quantization: bpy.props.EnumProperty(
+        name="Albedo 颜色量化",
+        items=(
+            ("NONE", "关闭", "直接导出 Albedo"),
+            ("FIXED", "指定调色板", "映射到用户指定的最近颜色"),
+            ("KMEANS", "自动调色板 · K-means", "逐帧使用标准 K-means 学习调色板"),
+        ),
+        default="NONE",
+    )
+    fixed_palette: bpy.props.StringProperty(
+        name="HEX 颜色", description="填写六位 HEX 颜色，用逗号或空格分隔",
+        default="#202030, #63546B, #D28570, #F4D8AE",
+    )
+    kmeans_colors: bpy.props.IntProperty(name="颜色数 K", default=16, min=1, max=256)
+    kmeans_iterations: bpy.props.IntProperty(name="最大迭代次数", default=20, min=1, max=100)
+    kmeans_seed: bpy.props.IntProperty(name="随机种子", default=0, min=0)
     use_normal: bpy.props.BoolProperty(name="NormalMap", default=True)
     unity_2d_normal_map: bpy.props.BoolProperty(
         name="按 Unity 2D 法线坐标导出",

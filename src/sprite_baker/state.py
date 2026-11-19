@@ -14,6 +14,8 @@ class SceneState:
         self.resolution_percentage = scene.render.resolution_percentage
         self.filter_size = scene.render.filter_size if hasattr(scene.render, "filter_size") else None
         self.film_transparent = scene.render.film_transparent
+        self.use_compositing = scene.render.use_compositing
+        self.dither_intensity = scene.render.dither_intensity
         self.image_file_format = scene.render.image_settings.file_format
         self.image_color_mode = scene.render.image_settings.color_mode
         self.image_color_depth = scene.render.image_settings.color_depth
@@ -46,6 +48,8 @@ class SceneState:
         if self.filter_size is not None and hasattr(self.scene.render, "filter_size"):
             self.scene.render.filter_size = self.filter_size
         self.scene.render.film_transparent = self.film_transparent
+        self.scene.render.use_compositing = self.use_compositing
+        self.scene.render.dither_intensity = self.dither_intensity
         self.scene.render.image_settings.file_format = self.image_file_format
         self.scene.render.image_settings.color_mode = self.image_color_mode
         self.scene.render.image_settings.color_depth = self.image_color_depth

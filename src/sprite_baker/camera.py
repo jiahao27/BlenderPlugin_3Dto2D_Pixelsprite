@@ -3,6 +3,8 @@ import math
 import bpy
 from mathutils import Matrix, Vector
 
+from .bake_options import output_size
+
 
 def make_camera(scene, settings):
     data = bpy.data.cameras.new("SBK_TMP_camera")
@@ -37,7 +39,8 @@ def configure_camera(scene, camera, settings, bounds, angle_deg=0.0):
     size = bounds["max"] - bounds["min"]
     horizontal = max(size.x, 0.01)
     vertical = max(size.z, 0.01)
-    scale = max(horizontal * settings.resolution_y / settings.resolution_x, vertical)
+    width, height = output_size(settings)
+    scale = max(horizontal * height / width, vertical)
     scale *= 1.0 + settings.margin
     distance = max(scale * 4.0, 10.0)
 

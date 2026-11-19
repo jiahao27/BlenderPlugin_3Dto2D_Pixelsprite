@@ -3,6 +3,8 @@ from pathlib import Path
 import bpy
 
 from .atlas import is_prime
+from .bake_options import MAX_SUPERSAMPLE_PIXELS, enabled_passes, is_supersampled, output_size, supersample_factor
+from .image_processing import parse_palette
 
 
 def get_active_item(settings):
@@ -24,18 +26,12 @@ def target_objects(item):
 
 def validate_settings(context, preview=False):
     settings = context.scene.sprite_baker_settings
-    errors = []
-
-    if not (settings.use_albedo or settings.use_normal or settings.use_mask):
-        errors.append("至少需要启用一个导出通道。")
+    errors = processing_errors(settings)
 
     output_dir = Path(bpy.path.abspath(settings.output_dir))
     parent = output_dir if preview else output_dir.parent
     if not parent.exists():
         errors.append(f"输出目录的上级目录不存在：{parent}")
-
-    if settings.resolution_x <= 0 or settings.resolution_y <= 0:
-        errors.append("分辨率必须大于 0。")
 
     if settings.bake_mode == "CAMERA":
         camera = settings.bake_camera or context.scene.camera
@@ -68,6 +64,37 @@ def validate_settings(context, preview=False):
                 errors.append(f"烘焙目标“{item.name}”的自定义方向无效：{exc}")
 
     return errors
+
+
+def processing_errors(settings):
+    errors = []
+    if not enabled_passes(settings):
+        if is_supersampled(settings):
+            errors.append("高采样至少需要启用 Albedo 或 NormalMap；MaskTex 暂不支持高采样。")
+        else:
+            errors.append("至少需要启用一个导出通道。")
+
+    width, height = output_size(settings)
+    if width <= 0 or height <= 0:
+        errors.append("分辨率必须大于 0。")
+    factor = supersample_factor(settings)
+    if min(width, height) > 0 and min(width, height) * factor < 4:
+        errors.append("Blender 渲染宽高至少为 4 像素，请提高画布分辨率或采样倍数。")
+    if factor > 1 and width * height * factor ** 2 > MAX_SUPERSAMPLE_PIXELS:
+        errors.append(f"高采样渲染尺寸 {width * factor} × {height * factor} 超过 16,777,216 像素，请降低分辨率或倍数。")
+
+    if settings.use_albedo and settings.color_quantization == "FIXED":
+        try:
+            parse_palette(settings.fixed_palette)
+        except ValueError as exc:
+            errors.append(f"Albedo 调色板无效：{exc}")
+    return errors
+
+
+def processing_warnings(settings):
+    if is_supersampled(settings) and settings.use_mask:
+        return ["高采样模式将跳过 MaskTex；切回低采样可恢复遮罩导出。"]
+    return []
 
 
 def atlas_warnings(context):

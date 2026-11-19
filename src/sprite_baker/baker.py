@@ -1,17 +1,21 @@
 import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import bpy
 from mathutils import Vector
 
 from .atlas import build_sprite_atlas
+from .bake_image import process_render
+from .bake_options import enabled_passes, is_supersampled, output_size, supersample_factor
 from .camera import configure_camera, make_camera, make_visible_bake_camera, object_bounds, pivot_for_item, rotate_objects
+from .image_processing import parse_palette
 from .materials import setup_albedo, setup_mask, setup_normal
 from .naming import PASS_LABELS, blend_abspath, frame_name, slugify
 from .normal_map import expand_transparent_edge
 from .pixel_tools.viewport_preview import remove_viewport_pixel_preview, setup_viewport_pixel_preview
 from .state import SceneState, remove_temp_data
-from .validation import get_active_item, target_objects
+from .validation import get_active_item, processing_errors, target_objects
 
 
 class SpriteBaker:
@@ -21,6 +25,7 @@ class SpriteBaker:
         self.settings = self.scene.sprite_baker_settings
 
     def render_preview(self):
+        self.prepare_image_processing()
         item = self.preview_item()
         ensure_directions(item)
         action_name, action, frame_start, _frame_end = self.action_jobs(item)[0]
@@ -29,6 +34,7 @@ class SpriteBaker:
         return self.render_job(item, action_name, action, direction, frame_start, output_root, preview=True)
 
     def export_all(self):
+        self.prepare_image_processing()
         output_root = blend_abspath(self.settings.output_dir, bpy)
         output_root.mkdir(parents=True, exist_ok=True)
         written = 0
@@ -63,6 +69,23 @@ class SpriteBaker:
                 atlas_files = self.write_atlases(output_root, item, action_name, metadata)
                 self.write_metadata(output_root, item, action_name, metadata, atlas_files)
         return written
+
+    def prepare_image_processing(self):
+        errors = processing_errors(self.settings)
+        if errors:
+            raise ValueError("\n".join(errors))
+
+        self.frame_size = output_size(self.settings)
+        self.sample_factor = supersample_factor(self.settings)
+        self.palette_options = None
+        if self.settings.use_albedo and self.settings.color_quantization == "FIXED":
+            self.palette_options = {"palette": parse_palette(self.settings.fixed_palette)}
+        elif self.settings.use_albedo and self.settings.color_quantization == "KMEANS":
+            self.palette_options = {
+                "k": self.settings.kmeans_colors,
+                "max_iterations": self.settings.kmeans_iterations,
+                "seed": self.settings.kmeans_seed,
+            }
 
     def export_items(self):
         if self.settings.bake_mode == "CAMERA":
@@ -131,19 +154,18 @@ class SpriteBaker:
                 self.setup_pass(objects, pass_id)
                 filepath = self.output_path(output_root, item, action_name, direction, output_frame or frame, pass_id, preview)
                 filepath.parent.mkdir(parents=True, exist_ok=True)
-                self.scene.render.filepath = str(filepath)
-                bpy.ops.render.render(write_still=True)
+                self.render_pass(filepath, pass_id)
                 if pass_id == "NORMAL" and self.settings.normal_map_edge_padding:
                     expand_transparent_edge(filepath)
                 files.append(str(filepath.relative_to(output_root)))
 
-            self._last_frame_size = (self.settings.resolution_x, self.settings.resolution_y)
-            self._last_pivot_px = (self.settings.resolution_x // 2, self.settings.resolution_y // 2)
+            self._last_frame_size = self.frame_size
+            self._last_pivot_px = tuple(size // 2 for size in self.frame_size)
             self._last_scale = scale
             return files
         finally:
             state.restore()
-            if self.settings.enable_pixel_bake:
+            if self.settings.enable_pixel_bake and not is_supersampled(self.settings):
                 remove_viewport_pixel_preview(self.scene)
             remove_temp_data()
 
@@ -160,12 +182,9 @@ class SpriteBaker:
             self.scene.render.engine = "BLENDER_EEVEE_NEXT"
         except TypeError:
             self.scene.render.engine = "BLENDER_EEVEE"
-        if self.settings.enable_pixel_bake and self.settings.pixel_canvas_preset != "CUSTOM":
-            size = int(self.settings.pixel_canvas_preset)
-            self.settings.resolution_x = size
-            self.settings.resolution_y = size
-        self.scene.render.resolution_x = self.settings.resolution_x
-        self.scene.render.resolution_y = self.settings.resolution_y
+        width, height = self.frame_size
+        self.scene.render.resolution_x = width * self.sample_factor
+        self.scene.render.resolution_y = height * self.sample_factor
         self.scene.render.resolution_percentage = 100
         self.scene.render.film_transparent = True
         self.scene.render.image_settings.file_format = "PNG"
@@ -184,6 +203,10 @@ class SpriteBaker:
                 obj.hide_render = obj not in visible
 
     def configure_pixel_compositor(self):
+        if is_supersampled(self.settings):
+            # Use the unscaled render; the selected algorithm owns downsampling.
+            self.scene.render.use_compositing = False
+            return
         if not self.settings.enable_pixel_bake:
             return
         preview_scale = 1.0
@@ -195,6 +218,30 @@ class SpriteBaker:
             self.settings.pixel_preview_offset_x,
             self.settings.pixel_preview_offset_y,
         )
+
+    def render_pass(self, filepath, pass_id):
+        render = self.scene.render
+        palette_options = self.palette_options if pass_id == "ALBEDO" else None
+        if self.sample_factor == 1 and palette_options is None:
+            render.filepath = str(filepath)
+            bpy.ops.render.render(write_still=True)
+            return
+
+        previous_dither = render.dither_intensity
+        render.dither_intensity = 0.0
+        try:
+            with TemporaryDirectory(prefix="sbk_", dir=filepath.parent) as temp_dir:
+                source = Path(temp_dir) / "source.png"
+                destination = Path(temp_dir) / "processed.png"
+                render.filepath = str(source)
+                bpy.ops.render.render(write_still=True)
+                process_render(
+                    source, destination, self.frame_size, self.sample_factor, pass_id,
+                    self.settings.pixel_downsample_method, palette_options,
+                )
+                destination.replace(filepath)
+        finally:
+            render.dither_intensity = previous_dither
 
     def configure_color_management_for_pass(self, pass_id):
         # Normal maps are vector data, not display colors. Writing them through
@@ -346,9 +393,9 @@ class SpriteBaker:
         action_root = output_root / slugify(item.name) / slugify(action_name)
         action_root.mkdir(parents=True, exist_ok=True)
         data = {
-            "frame_size": [self.settings.resolution_x, self.settings.resolution_y],
+            "frame_size": list(self.frame_size),
             "frame_count": max((entry["frame"] for entry in frames), default=0),
-            "pivot_px": [self.settings.resolution_x // 2, self.settings.resolution_y // 2],
+            "pivot_px": [size // 2 for size in self.frame_size],
             "pixels_per_unit": self.settings.pixels_per_unit,
             "item": item.name,
             "action": action_name,
@@ -357,17 +404,6 @@ class SpriteBaker:
         }
         with (action_root / "metadata.json").open("w", encoding="utf-8") as handle:
             json.dump(data, handle, indent=2, ensure_ascii=False)
-
-
-def enabled_passes(settings):
-    passes = []
-    if settings.use_albedo:
-        passes.append("ALBEDO")
-    if settings.use_normal:
-        passes.append("NORMAL")
-    if settings.use_mask:
-        passes.append("MASK")
-    return passes
 
 
 def bounds_from_points(points):
